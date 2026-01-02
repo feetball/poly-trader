@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { GlassCard } from "./ui/GlassCard";
 import { LiquidButton } from "./ui/LiquidButton";
 import { Activity, Power, RefreshCw, Terminal } from "lucide-react";
+import { API_BASE } from "../lib/api";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -13,7 +14,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [status, setStatus] = useState<any>({ status: "unknown" });
 
   useEffect(() => {
-    fetch("http://localhost:3030/api/status")
+    fetch(`${API_BASE}/api/status`)
       .then((res) => res.json())
       .then((data) => setStatus(data))
       .catch(() => setStatus({ status: "offline" }));
@@ -21,7 +22,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
   const toggleBot = async () => {
     const endpoint = status.status === "running" ? "stop" : "start";
-    await fetch(`http://localhost:3030/api/bot/${endpoint}`, { method: "POST" });
+    await fetch(`${API_BASE}/api/bot/${endpoint}`, { method: "POST" });
     window.location.reload();
   };
 

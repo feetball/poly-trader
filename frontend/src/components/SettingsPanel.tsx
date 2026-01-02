@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { GlassCard } from "./ui/GlassCard";
 import { LiquidButton } from "./ui/LiquidButton";
 import { Settings, Save } from "lucide-react";
+import { API_BASE } from "../lib/api";
 
 export default function SettingsPanel() {
   const [settings, setSettings] = useState<any>(null);
@@ -11,8 +12,7 @@ export default function SettingsPanel() {
   const [versionInfo, setVersionInfo] = useState<any>(null);
 
   useEffect(() => {
-    // In Docker, client-side fetch to localhost:3030 works if port is exposed
-    fetch("http://localhost:3030/api/settings")
+    fetch(`${API_BASE}/api/settings`)
       .then((res) => res.json())
       .then((data) => {
         setSettings(data);
@@ -30,7 +30,7 @@ export default function SettingsPanel() {
         setLoading(false);
       });
 
-      fetch("http://localhost:3030/api/version")
+      fetch(`${API_BASE}/api/version`)
         .then(res => res.json())
         .then(data => setVersionInfo(data))
         .catch(err => console.error("Failed to fetch version", err));
@@ -38,7 +38,7 @@ export default function SettingsPanel() {
 
   const saveSettings = async () => {
     try {
-        await fetch("http://localhost:3030/api/settings", {
+        await fetch(`${API_BASE}/api/settings`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(settings),
@@ -92,7 +92,7 @@ export default function SettingsPanel() {
         <div>
           <label className="block text-xs font-medium text-white/60 mb-2 uppercase tracking-wider">Active Strategies</label>
           <div className="flex flex-wrap gap-2">
-            {["arbitrage", "volume_spike", "copy_trading", "market_making", "ai_signals"].map((strat) => (
+            {["arbitrage", "volume_spike", "updown_15", "copy_trading", "market_making", "ai_signals"].map((strat) => (
               <label 
                 key={strat} 
                 className={`

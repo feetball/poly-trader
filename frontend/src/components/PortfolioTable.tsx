@@ -3,13 +3,14 @@
 import { useState, useEffect } from "react";
 import { GlassCard } from "./ui/GlassCard";
 import { Briefcase, TrendingUp, TrendingDown } from "lucide-react";
+import { API_BASE } from "../lib/api";
 
 export default function PortfolioTable() {
   const [positions, setPositions] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchPortfolio = () => {
-      fetch("http://localhost:3030/api/portfolio")
+      fetch(`${API_BASE}/api/portfolio`)
         .then((res) => res.json())
         .then((data) => setPositions(data))
         .catch(() => setPositions([]));

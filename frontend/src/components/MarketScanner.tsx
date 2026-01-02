@@ -3,13 +3,14 @@
 import { useState, useEffect } from "react";
 import { GlassCard } from "./ui/GlassCard";
 import { Radar, TrendingUp, Activity } from "lucide-react";
+import { API_BASE } from "../lib/api";
 
 export default function MarketScanner() {
   const [markets, setMarkets] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchMarkets = () => {
-      fetch("http://localhost:3030/api/markets")
+      fetch(`${API_BASE}/api/markets`)
         .then((res) => res.json())
         .then((data) => setMarkets(data))
         .catch(() => setMarkets([]));

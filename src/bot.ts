@@ -2,6 +2,7 @@ import { PolymarketClient } from "./clients/polymarket";
 import { Strategy, StrategyContext } from "./strategies/base";
 import { ArbitrageStrategy } from "./strategies/arbitrage";
 import { VolumeSpikeStrategy } from "./strategies/volume";
+import { UpDown15Strategy } from "./strategies/updown15";
 import { PositionManager, Position } from "./managers/position_manager";
 import { MarketDataStream } from "./clients/websocket";
 import { UserAnalysisService } from "./services/user_analysis";
@@ -34,7 +35,7 @@ export class Bot {
     maxPositionSize: 50, // USDC
     stopLossPercentage: 10,
     takeProfitPercentage: 20,
-    enabledStrategies: ["arbitrage", "volume_spike"]
+    enabledStrategies: ["arbitrage", "volume_spike", "updown_15"]
   };
 
   private strategies: Strategy[] = [];
@@ -53,7 +54,8 @@ export class Bot {
   private initializeStrategies() {
     this.strategies = [
       new ArbitrageStrategy(),
-      new VolumeSpikeStrategy()
+      new VolumeSpikeStrategy(),
+      new UpDown15Strategy()
     ];
   }
 
