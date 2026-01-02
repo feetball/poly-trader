@@ -91,7 +91,12 @@ export class PositionManager {
 
   addPosition(marketId: string, title: string, outcome: "YES" | "NO", shares: number, price: number) {
     const cost = shares * price;
-    if (!this.checkRisk(cost)) return false;
+    if (!this.checkRisk(cost)) {
+      console.warn(
+        `Position rejected by risk limits: marketId=${marketId}, outcome=${outcome}, cost=${cost}`
+      );
+      return false;
+    }
 
     const key = `${marketId}-${outcome}`;
     const existing = this.positions.get(key);
