@@ -11,12 +11,73 @@ export interface Position {
   status: "OPEN" | "CLOSED";
 }
 
+export interface RiskLimits {
+  maxPositionSize: number; // Max USDC per position
+  maxPortfolioExposure: number; // Max total USDC exposed
+  stopLossPercentage: number; // Max loss % before auto-close
+  dailyLossLimit: number; // Max daily loss
+}
+
 export class PositionManager {
   private positions: Map<string, Position> = new Map();
   private client: PolymarketClient;
+  private riskLimits: RiskLimits = {
+    maxPositionSize: 50,
+    maxPortfolioExposure: 500,
+    stopLossPercentage: 15,
+    dailyLossLimit: 100
+  };
+  private dailyPnL: number = 0;
+  private lastDailyPnLResetDate: string | null = null;
 
   constructor(client: PolymarketClient) {
     this.client = client;
+    // Initialize the daily PnL reset date to today so we only reset when the day actually changes.
+    this.lastDailyPnLResetDate = new Date().toISOString().slice(0, 10);
+  }
+
+  updateRiskLimits(limits: Partial<RiskLimits>) {
+    this.riskLimits = { ...this.riskLimits, ...limits };
+  }
+
+  /**
+   * Ensure that dailyPnL represents only today's PnL by resetting it
+   * when a new calendar day starts.
+   */
+  private ensureDailyPnLReset(): void {
+    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    if (this.lastDailyPnLResetDate !== today) {
+      this.dailyPnL = 0;
+      this.lastDailyPnLResetDate = today;
+    }
+  }
+
+  checkRisk(sizeUSDC: number): boolean {
+    // Ensure daily PnL is scoped to the current day before applying risk checks
+    this.ensureDailyPnLReset();
+    // 1. Check Position Size Limit
+    if (sizeUSDC > this.riskLimits.maxPositionSize) {
+      console.warn(`Risk Check Failed: Order size ${sizeUSDC} > Max ${this.riskLimits.maxPositionSize}`);
+      return false;
+    }
+
+    // 2. Check Portfolio Exposure
+    const currentExposure = Array.from(this.positions.values())
+      .filter(p => p.status === "OPEN")
+      .reduce((sum, p) => sum + (p.shares * p.avgPrice), 0);
+    
+    if (currentExposure + sizeUSDC > this.riskLimits.maxPortfolioExposure) {
+      console.warn(`Risk Check Failed: Exposure ${currentExposure + sizeUSDC} > Max ${this.riskLimits.maxPortfolioExposure}`);
+      return false;
+    }
+
+    // 3. Check Daily Loss Limit
+    if (this.dailyPnL < -this.riskLimits.dailyLossLimit) {
+      console.warn(`Risk Check Failed: Daily Loss ${this.dailyPnL} exceeds limit ${this.riskLimits.dailyLossLimit}`);
+      return false;
+    }
+
+    return true;
   }
 
   async syncPositions() {
@@ -29,6 +90,14 @@ export class PositionManager {
   }
 
   addPosition(marketId: string, title: string, outcome: "YES" | "NO", shares: number, price: number) {
+    const cost = shares * price;
+    if (!this.checkRisk(cost)) {
+      console.warn(
+        `Position rejected by risk limits: marketId=${marketId}, outcome=${outcome}, cost=${cost}`
+      );
+      return false;
+    }
+
     const key = `${marketId}-${outcome}`;
     const existing = this.positions.get(key);
 
@@ -50,6 +119,7 @@ export class PositionManager {
         status: "OPEN"
       });
     }
+    return true;
   }
 
   updatePrices(marketPrices: Map<string, number>) {
@@ -65,8 +135,31 @@ export class PositionManager {
         const price = position.outcome === "YES" ? currentProb : (1 - currentProb);
         position.currentPrice = price;
         position.pnl = (position.currentPrice - position.avgPrice) * position.shares;
+
+        // Check Stop Loss only when position is at a loss
+        if (position.pnl < 0) {
+          const lossPct = Math.abs((position.pnl / (position.shares * position.avgPrice)) * 100);
+          if (lossPct > this.riskLimits.stopLossPercentage) {
+            console.log(`Stop Loss Triggered for ${position.title}: -${lossPct.toFixed(2)}%`);
+            // In real bot, trigger sell order here
+            this.closePosition(position.marketId, position.outcome, position.currentPrice);
+          }
+        }
       }
     }
+  }
+
+  closePosition(marketId: string, outcome: "YES" | "NO", price: number) {
+      const key = `${marketId}-${outcome}`;
+      const position = this.positions.get(key);
+      if (position && position.status === "OPEN") {
+          const pnl = (price - position.avgPrice) * position.shares;
+          this.dailyPnL += pnl;
+          position.status = "CLOSED";
+          position.shares = 0;
+          position.pnl = pnl;
+          console.log(`Position Closed: ${position.title} (${outcome}) PnL: $${pnl.toFixed(2)}`);
+      }
   }
 
   getPositions(): Position[] {
@@ -80,11 +173,15 @@ export class PositionManager {
         if (position.outcome === winningOutcome) {
           // Winner: Payout $1.00 per share
           const payout = position.shares * 1.0;
-          position.pnl = payout - (position.shares * position.avgPrice);
+          const pnl = payout - (position.shares * position.avgPrice);
+          this.dailyPnL += pnl;
+          position.pnl = pnl;
           position.currentPrice = 1.0;
         } else {
           // Loser: Payout $0.00
-          position.pnl = -(position.shares * position.avgPrice);
+          const pnl = -(position.shares * position.avgPrice);
+          this.dailyPnL += pnl;
+          position.pnl = pnl;
           position.currentPrice = 0.0;
         }
         position.status = "CLOSED";
