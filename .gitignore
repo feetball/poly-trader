@@ -14,7 +14,7 @@ pnpm-debug.log*
 dist/
 build/
 .next/
-src/frontend/.next/
+frontend/.next/
 
 # Logs
 logs/
