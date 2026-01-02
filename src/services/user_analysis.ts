@@ -46,7 +46,7 @@ export class UserAnalysisService {
         const type = (validType === 'BUY' || validType === 'SELL') ? validType : 'UNKNOWN';
         
         if (type === 'UNKNOWN') {
-          console.warn(`Unknown trade type for transaction ${t.id}:`, t.type);
+          console.warn(`Unknown trade type '${t.type}' for transaction ${t.id}. Expected 'BUY' or 'SELL'`);
         }
         
         return {
