@@ -117,29 +117,41 @@ export class Bot {
         console.log("Scanning markets...");
         
         // 1. Fetch Real Market Data via Gamma API
-        // Note: In a real scenario, we would use pagination or specific queries
-        const gammaMarkets = await this.client.getGammaMarkets({ limit: 10, active: true });
+        const events = await this.client.getGammaMarkets({ 
+          limit: 10, 
+          active: true, 
+          closed: false,
+          order: "volume24hr",
+          ascending: false
+        });
         
         // Map Gamma data to our internal structure
-        if (Array.isArray(gammaMarkets)) {
-            this.scannedMarkets = gammaMarkets.map((m: any) => ({
-                id: m.id,
-                question: m.title,
-                volume: Number(m.volume) || 0,
-                probability: 0.5, // Gamma API structure varies, simplified here
-                tags: m.tags ? m.tags.map((t: any) => t.label) : []
-            }));
-        } else {
-            // Fallback to mock if API fails or returns unexpected format
-             this.scannedMarkets = [
-                {
-                    id: "mkt-1",
-                    question: "Presidential Election Winner 2024",
-                    volume: 5000000 + Math.floor(Math.random() * 100000),
-                    probability: 0.45 + (Math.random() * 0.05),
-                    tags: ["Politics", "US"]
+        if (Array.isArray(events)) {
+            const markets: ScannedMarket[] = [];
+            
+            for (const event of events) {
+                // Gamma API returns events which contain markets
+                const eventMarkets = event.markets || [];
+                for (const m of eventMarkets) {
+                    // Try to parse probability from outcomePrices
+                    let prob = 0.5;
+                    try {
+                        if (m.outcomePrices) {
+                            const prices = JSON.parse(m.outcomePrices);
+                            prob = parseFloat(prices[0]); // Assume YES is index 0
+                        }
+                    } catch (e) {}
+
+                    markets.push({
+                        id: m.id,
+                        question: m.question,
+                        volume: Number(m.volume) || 0,
+                        probability: prob,
+                        tags: [event.slug?.split('-')[0] || "General"] // Simple tag extraction
+                    });
                 }
-            ];
+            }
+            this.scannedMarkets = markets.slice(0, 20); // Keep top 20
         }
 
         // 2. Run Strategies
@@ -150,12 +162,13 @@ export class Bot {
 
         for (const strategy of this.strategies) {
             if (this.settings.enabledStrategies.includes(strategy.id)) {
-                console.log(`Running strategy: ${strategy.name}`);
+                // console.log(`Running strategy: ${strategy.name}`);
                 const opportunities = await strategy.analyze(context);
                 
                 if (opportunities.length > 0) {
                     console.log(`Found ${opportunities.length} opportunities via ${strategy.name}`);
                     // Execute trades here...
+                    // For now, we could add them to a "Signals" list if we had one
                 }
             }
         }
