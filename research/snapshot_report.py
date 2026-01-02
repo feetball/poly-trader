@@ -1,5 +1,4 @@
 import requests
-import time
 import os
 from datetime import datetime
 
