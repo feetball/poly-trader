@@ -16,6 +16,7 @@ services:
     restart: unless-stopped
     volumes:
       - ./research:/app/research # Persist research data
+      - ./data:/app/data # Persist runtime settings
 
   frontend:
     build:

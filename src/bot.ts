@@ -6,6 +6,8 @@ import { UpDown15Strategy } from "./strategies/updown15";
 import { PositionManager, Position } from "./managers/position_manager";
 import { MarketDataStream } from "./clients/websocket";
 import { UserAnalysisService } from "./services/user_analysis";
+import fs from "node:fs";
+import path from "node:path";
 
 export interface BotSettings {
   minLiquidity: number;
@@ -30,6 +32,7 @@ export class Bot {
   private marketStream: MarketDataStream;
   private userAnalysis: UserAnalysisService;
   private walletBalance: number = 10000; // Default $10k
+  private readonly settingsPath: string;
   
   private settings: BotSettings = {
     minLiquidity: 10000,
@@ -48,8 +51,68 @@ export class Bot {
     this.positionManager = new PositionManager(client);
     this.marketStream = new MarketDataStream();
     this.userAnalysis = new UserAnalysisService();
+
+    this.settingsPath =
+      process.env.SETTINGS_PATH || path.join(process.cwd(), "data", "settings.json");
+    this.loadSettingsFromDisk();
+
     this.initializeStrategies();
     this.setupMarketStream();
+  }
+
+  private loadSettingsFromDisk() {
+    try {
+      if (!fs.existsSync(this.settingsPath)) return;
+      const raw = fs.readFileSync(this.settingsPath, "utf8");
+      const parsed = JSON.parse(raw);
+      this.settings = { ...this.settings, ...this.sanitizeSettings(parsed) };
+      console.log(`Loaded settings from ${this.settingsPath}`);
+    } catch (e) {
+      console.warn("Failed to load settings from disk; using defaults:", e);
+    }
+  }
+
+  private saveSettingsToDisk() {
+    try {
+      const dir = path.dirname(this.settingsPath);
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(this.settingsPath, JSON.stringify(this.settings, null, 2), "utf8");
+    } catch (e) {
+      console.warn("Failed to persist settings to disk:", e);
+    }
+  }
+
+  private sanitizeSettings(input: any): Partial<BotSettings> {
+    const out: Partial<BotSettings> = {};
+
+    if (input && typeof input === "object") {
+      if (typeof input.minLiquidity === "number" && Number.isFinite(input.minLiquidity)) {
+        out.minLiquidity = Math.max(0, input.minLiquidity);
+      }
+      if (typeof input.maxPositionSize === "number" && Number.isFinite(input.maxPositionSize)) {
+        out.maxPositionSize = Math.max(0, input.maxPositionSize);
+      }
+      if (
+        typeof input.stopLossPercentage === "number" &&
+        Number.isFinite(input.stopLossPercentage)
+      ) {
+        out.stopLossPercentage = Math.max(0, input.stopLossPercentage);
+      }
+      if (
+        typeof input.takeProfitPercentage === "number" &&
+        Number.isFinite(input.takeProfitPercentage)
+      ) {
+        out.takeProfitPercentage = Math.max(0, input.takeProfitPercentage);
+      }
+      if (Array.isArray(input.enabledStrategies)) {
+        out.enabledStrategies = input.enabledStrategies
+          .filter((s: any) => typeof s === "string")
+          .map((s: string) => s.trim())
+          .filter(Boolean);
+      }
+    }
+
+    return out;
   }
 
   private initializeStrategies() {
@@ -113,7 +176,9 @@ export class Bot {
   }
 
   updateSettings(newSettings: Partial<BotSettings>) {
-    this.settings = { ...this.settings, ...newSettings };
+    const sanitized = this.sanitizeSettings(newSettings);
+    this.settings = { ...this.settings, ...sanitized };
+    this.saveSettingsToDisk();
     console.log("Settings updated:", this.settings);
     return this.settings;
   }
