@@ -8,17 +8,24 @@ export interface UserTrade {
   price: number;
   size: number;
   timestamp: number;
-  type: "BUY" | "SELL";
+  type: "BUY" | "SELL" | "UNKNOWN";
 }
 
 export class UserAnalysisService {
   private subgraphUrl = "https://api.thegraph.com/subgraphs/name/tokenunion/polymarket-matic";
 
   async getUserTrades(address: string): Promise<UserTrade[]> {
+    // Validate address format to prevent injection attacks (Ethereum address: 0x followed by 40 hex characters)
+    const addressPattern = /^0x[a-fA-F0-9]{40}$/;
+    if (!addressPattern.test(address)) {
+      console.error("Invalid address format:", address);
+      return [];
+    }
+
     const query = `
-      {
+      query GetUserTrades($userAddress: String!) {
         transactions(
-          where: { user: "${address.toLowerCase()}" }
+          where: { user: $userAddress }
           orderBy: timestamp
           orderDirection: desc
           first: 50
@@ -37,20 +44,36 @@ export class UserAnalysisService {
       }
     `;
 
+    const variables = {
+      userAddress: address.toLowerCase()
+    };
+
     try {
-      const response = await axios.post(this.subgraphUrl, { query });
+      const response = await axios.post(this.subgraphUrl, { 
+        query, 
+        variables 
+      });
       const data = response.data?.data?.transactions || [];
       
-      return data.map((t: any) => ({
-        id: t.id,
-        marketId: t.market.id,
-        question: t.market.question,
-        outcomeIndex: Number(t.outcomeIndex),
-        price: Number(t.price),
-        size: Number(t.amount),
-        timestamp: Number(t.timestamp),
-        type: t.type.toUpperCase()
-      }));
+      return data.map((t: any) => {
+        const validType = t.type?.toUpperCase();
+        const type = (validType === 'BUY' || validType === 'SELL') ? validType : 'UNKNOWN';
+        
+        if (type === 'UNKNOWN') {
+          console.warn(`Unknown trade type '${t.type}' for transaction ${t.id}. Expected 'BUY' or 'SELL'`);
+        }
+        
+        return {
+          id: t.id,
+          marketId: t.market.id,
+          question: t.market.question,
+          outcomeIndex: Number(t.outcomeIndex),
+          price: Number(t.price),
+          size: Number(t.amount),
+          timestamp: Number(t.timestamp),
+          type
+        };
+      });
     } catch (error) {
       console.error("Error fetching user trades:", error);
       return [];

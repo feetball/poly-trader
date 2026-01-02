@@ -39,6 +39,36 @@ def fetch_user_trades(user_address):
         print(f"Error fetching data: {response.status_code}")
         return []
 
+def convert_timestamp(timestamp_value):
+    """
+    Convert a timestamp to datetime, handling various formats.
+    
+    Args:
+        timestamp_value: The timestamp value (can be string, int, or float)
+        
+    Returns:
+        datetime object or None if conversion fails
+    
+    Notes:
+        - Handles both second and millisecond precision timestamps
+        - Assumes timestamps > 1e12 (Sep 2001 in milliseconds) are in milliseconds
+        - Preserves fractional seconds when provided
+    """
+    try:
+        # Convert to float to preserve fractional seconds
+        timestamp = float(timestamp_value)
+        
+        # Check if timestamp is in milliseconds
+        # Use 1e12 as threshold (corresponds to Sep 9, 2001 01:46:40 UTC if milliseconds, ~year 31688 if seconds)
+        # All realistic timestamps after Sep 2001 in milliseconds will be > 1e12
+        if timestamp > 1e12:
+            timestamp = timestamp / 1000.0
+        
+        return datetime.fromtimestamp(timestamp)
+    except (ValueError, TypeError, OSError) as e:
+        print(f"Warning: Could not convert timestamp '{timestamp_value}': {e}")
+        return None
+
 def analyze_trades(trades):
     print(f"Analyzing {len(trades)} trades for {TARGET_USER}...")
     
