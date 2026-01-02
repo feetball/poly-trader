@@ -23,14 +23,12 @@ if [ "$MODE" == "dev" ]; then
   npm run dev &
   
   # 2. Start Frontend (if initialized)
-  if [ -f "frontend/package.json" ]; then
+  if [ -f "src/frontend/package.json" ]; then
     echo "🖥️  Starting Frontend (Dashboard)..."
-    cd frontend
-    npm run dev &
-    cd ..
+    (cd src/frontend && npm run dev &)
   else
     echo "⚠️  Frontend not initialized. Skipping frontend start."
-    echo "   To setup frontend: cd frontend && npx create-next-app@latest ."
+    echo "   To setup frontend: cd src/frontend && npx create-next-app@latest ."
   fi
 
   # Keep script running to maintain background processes

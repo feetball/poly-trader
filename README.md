@@ -8,7 +8,7 @@ A Polymarket trading bot inspired by the architecture of `feetball/trader`.
     - **`bot.ts`**: The main trading loop.
     - **`clients/polymarket.ts`**: Wrapper for the official `@polymarket/clob-client`.
     - **`index.ts`**: Express server entry point.
-- **`frontend/`**: Directory for the Next.js dashboard (see `frontend/README.md`).
+- **`src/frontend/`**: Directory for the Next.js dashboard (see `src/frontend/README.md`).
 
 ## Prerequisites
 
