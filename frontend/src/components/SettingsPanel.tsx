@@ -140,8 +140,10 @@ export default function SettingsPanel() {
           <label className="block text-xs font-medium text-white/60 mb-1.5 uppercase tracking-wider">Max Position (USDC)</label>
           <input
             type="number"
-            value={settings?.maxPositionSize || 0}
-            onChange={(e) => setSettings({ ...settings, maxPositionSize: Number(e.target.value) })}
+            value={settings?.maxPositionSize ?? 0}
+            onChange={(e) => {
+              if (settings) setSettings({ ...settings, maxPositionSize: Number(e.target.value) });
+            }}
             className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-blue-500/50 transition-colors"
           />
         </div>
@@ -169,8 +171,10 @@ export default function SettingsPanel() {
             <label className="block text-xs font-medium text-white/60 mb-1.5 uppercase tracking-wider">Stop Loss (%)</label>
             <input
               type="number"
-              value={settings?.stopLossPercentage || 0}
-              onChange={(e) => setSettings({ ...settings, stopLossPercentage: Number(e.target.value) })}
+              value={settings?.stopLossPercentage ?? 0}
+              onChange={(e) => {
+                if (settings) setSettings({ ...settings, stopLossPercentage: Number(e.target.value) });
+              }}
               className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-blue-500/50 transition-colors"
             />
           </div>
@@ -178,8 +182,10 @@ export default function SettingsPanel() {
             <label className="block text-xs font-medium text-white/60 mb-1.5 uppercase tracking-wider">Take Profit (%)</label>
             <input
               type="number"
-              value={settings?.takeProfitPercentage || 0}
-              onChange={(e) => setSettings({ ...settings, takeProfitPercentage: Number(e.target.value) })}
+              value={settings?.takeProfitPercentage ?? 0}
+              onChange={(e) => {
+                if (settings) setSettings({ ...settings, takeProfitPercentage: Number(e.target.value) });
+              }}
               className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-blue-500/50 transition-colors"
             />
           </div>
@@ -203,9 +209,10 @@ export default function SettingsPanel() {
                   className="hidden"
                   checked={settings?.enabledStrategies?.includes(strat) || false}
                   onChange={(e) => {
+                    if (!settings) return;
                     const newStrats = e.target.checked
-                      ? [...settings.enabledStrategies, strat]
-                      : settings.enabledStrategies.filter((s: string) => s !== strat);
+                      ? [...(settings.enabledStrategies || []), strat]
+                      : (settings.enabledStrategies || []).filter((s: string) => s !== strat);
                     setSettings({ ...settings, enabledStrategies: newStrats });
                   }}
                 />
