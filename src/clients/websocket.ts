@@ -5,7 +5,8 @@ export class MarketDataStream extends EventEmitter {
   private ws: WebSocket | null = null;
   private pingInterval: NodeJS.Timeout | null = null;
   private subscriptions: Set<string> = new Set();
-  private url = "wss://ws-clob.polymarket.com/ws";
+  private url = process.env.POLYMARKET_WS_URL || "wss://ws-subscriptions-clob.polymarket.com/ws/market";
+  private channelType = process.env.POLYMARKET_WS_CHANNEL || "market";
 
   constructor() {
     super();
@@ -46,9 +47,11 @@ export class MarketDataStream extends EventEmitter {
       return;
     }
 
+    // Polymarket CLOB WSS expects `assets_ids` and channel `type` for market subscriptions.
     const msg = {
-      type: "Market",
-      assets: assetIds
+      assets_ids: assetIds,
+      type: this.channelType,
+      operation: "subscribe",
     };
     
     this.ws.send(JSON.stringify(msg));
@@ -78,9 +81,10 @@ export class MarketDataStream extends EventEmitter {
   private startPing() {
     this.pingInterval = setInterval(() => {
       if (this.ws?.readyState === WebSocket.OPEN) {
-        this.ws.send(JSON.stringify({ type: "ping" }));
+        // Polymarket WSS quickstart uses plain "PING".
+        this.ws.send("PING");
       }
-    }, 30000);
+    }, 10000);
   }
 
   private stopPing() {

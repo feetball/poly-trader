@@ -1,5 +1,7 @@
 import PortfolioTable from "@/components/PortfolioTable";
 
+export const dynamic = 'force-dynamic';
+
 export default function PositionsPage() {
   return (
     <div className="space-y-6">

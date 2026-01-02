@@ -28,7 +28,7 @@ export function LiquidButton({ children, className, variant = "primary", ...prop
       )}
       {...props}
     >
-      <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 rounded-xl" />
+      <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 rounded-xl pointer-events-none" />
       <span className="relative z-10">{children}</span>
     </motion.button>
   );

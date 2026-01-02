@@ -52,6 +52,11 @@ export class PositionManager {
     }
   }
 
+  getDailyPnL(): number {
+    this.ensureDailyPnLReset();
+    return this.dailyPnL;
+  }
+
   checkRisk(sizeUSDC: number): boolean {
     // Ensure daily PnL is scoped to the current day before applying risk checks
     this.ensureDailyPnLReset();

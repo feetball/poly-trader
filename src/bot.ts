@@ -122,7 +122,7 @@ export class Bot {
     const positions = this.positionManager.getPositions();
     if (positions.length === 0) {
       // Return mock for UI demo if empty
-      return [
+      const mock = [
         {
           marketId: "0x123...",
           title: "Will Bitcoin hit $100k in 2024?",
@@ -144,8 +144,35 @@ export class Bot {
           status: "OPEN"
         }
       ] as Position[];
+
+      const totalUnrealizedPnL = mock.reduce((sum, p) => sum + (Number(p.pnl) || 0), 0);
+      const openWinners = mock.filter((p) => (Number(p.pnl) || 0) > 0).length;
+      const openLosers = mock.filter((p) => (Number(p.pnl) || 0) < 0).length;
+
+      return {
+        positions: mock,
+        summary: {
+          totalUnrealizedPnL,
+          openWinners,
+          openLosers,
+          dailyRealizedPnL: this.positionManager.getDailyPnL(),
+        },
+      };
     }
-    return positions;
+
+    const totalUnrealizedPnL = positions.reduce((sum, p) => sum + (Number(p.pnl) || 0), 0);
+    const openWinners = positions.filter((p) => (Number(p.pnl) || 0) > 0).length;
+    const openLosers = positions.filter((p) => (Number(p.pnl) || 0) < 0).length;
+
+    return {
+      positions,
+      summary: {
+        totalUnrealizedPnL,
+        openWinners,
+        openLosers,
+        dailyRealizedPnL: this.positionManager.getDailyPnL(),
+      },
+    };
   }
 
   getScannedMarkets() {

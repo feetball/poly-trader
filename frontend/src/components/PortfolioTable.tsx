@@ -7,13 +7,27 @@ import { API_BASE } from "../lib/api";
 
 export default function PortfolioTable() {
   const [positions, setPositions] = useState<any[]>([]);
+  const [summary, setSummary] = useState<any | null>(null);
 
   useEffect(() => {
     const fetchPortfolio = () => {
       fetch(`${API_BASE}/api/portfolio`)
         .then((res) => res.json())
-        .then((data) => setPositions(data))
-        .catch(() => setPositions([]));
+        .then((data) => {
+          // Backwards-compatible: support both old array response and new { positions, summary }.
+          if (Array.isArray(data)) {
+            setPositions(data);
+            setSummary(null);
+            return;
+          }
+
+          setPositions(Array.isArray(data?.positions) ? data.positions : []);
+          setSummary(data?.summary ?? null);
+        })
+        .catch(() => {
+          setPositions([]);
+          setSummary(null);
+        });
     };
 
     fetchPortfolio();
@@ -27,6 +41,46 @@ export default function PortfolioTable() {
         <Briefcase className="w-5 h-5 text-purple-400" />
         <h2 className="text-lg font-semibold text-white/90">Active Positions</h2>
       </div>
+
+      {summary && (
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-white/50 uppercase tracking-wider">Total P/L</span>
+            <div
+              className={`flex items-center gap-1 font-bold ${Number(summary.totalUnrealizedPnL) >= 0 ? "text-emerald-400" : "text-rose-400"}`}
+            >
+              {Number(summary.totalUnrealizedPnL) >= 0 ? (
+                <TrendingUp className="w-4 h-4" />
+              ) : (
+                <TrendingDown className="w-4 h-4" />
+              )}
+              <span>
+                {Number(summary.totalUnrealizedPnL) >= 0 ? "+" : ""}
+                {Number(summary.totalUnrealizedPnL).toFixed(2)}
+              </span>
+            </div>
+            <span
+              className={
+                `px-2 py-1 rounded-md text-[10px] font-extrabold tracking-widest border ` +
+                (Number(summary.totalUnrealizedPnL) >= 0
+                  ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-300"
+                  : "bg-rose-500/10 border-rose-500/20 text-rose-300")
+              }
+            >
+              {Number(summary.totalUnrealizedPnL) >= 0 ? "WIN" : "LOSS"}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-3 text-xs text-white/50">
+            <div>
+              Winners: <span className="text-emerald-300 font-bold">{Number(summary.openWinners) || 0}</span>
+            </div>
+            <div>
+              Losers: <span className="text-rose-300 font-bold">{Number(summary.openLosers) || 0}</span>
+            </div>
+          </div>
+        </div>
+      )}
       
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
