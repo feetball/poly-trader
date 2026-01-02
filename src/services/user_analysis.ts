@@ -8,7 +8,7 @@ export interface UserTrade {
   price: number;
   size: number;
   timestamp: number;
-  type: "BUY" | "SELL";
+  type: "BUY" | "SELL" | "UNKNOWN";
 }
 
 export class UserAnalysisService {
