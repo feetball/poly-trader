@@ -36,6 +36,13 @@ if [ "$MODE" == "dev" ]; then
 elif [ "$MODE" == "update" ]; then
   echo "🔄 Updating repository and redeploying containers..."
 
+  # Check for --no-rebuild flag
+  REBUILD=true
+  if [ "$2" == "--no-rebuild" ]; then
+    REBUILD=false
+    echo "⚠️  Rebuild disabled (--no-rebuild flag detected)"
+  fi
+
   if ! command -v git >/dev/null 2>&1; then
     echo "Error: git is required for update mode."
     exit 1
@@ -49,13 +56,14 @@ elif [ "$MODE" == "update" ]; then
 
   # Check for uncommitted changes
   if [ -n "$(git status --porcelain)" ]; then
-    if [ "$2" != "--force" ]; then
+    if [ "$2" != "--force" ] && [ "$3" != "--force" ]; then
       echo "⚠️  Uncommitted changes detected. Commit or stash them, or run './deploy.sh update --force' to force update."
       exit 1
     fi
     echo "Forcing update by discarding local changes..."
   fi
 
+  echo "📥 Fetching latest code from GitHub..."
   git fetch --all --prune
   git reset --hard origin/$BRANCH
   git clean -fd
@@ -73,11 +81,30 @@ elif [ "$MODE" == "update" ]; then
   fi
 
   if [ -f docker-compose.yml ]; then
-    echo "📦 Pulling, building, and starting containers..."
-    $COMPOSE pull --ignore-pull-failures || true
-    $COMPOSE build --pull
+    echo "🐳 Docker Compose detected"
+    
+    if [ "$REBUILD" = true ]; then
+      echo "📦 Building containers (pulling latest base images)..."
+      echo "  - Building bot container..."
+      $COMPOSE build bot --pull
+      echo "  ✅ Bot container built"
+      
+      echo "  - Building frontend container..."
+      $COMPOSE build frontend --pull
+      echo "  ✅ Frontend container built"
+    else
+      echo "⏭️  Skipping container rebuild (--no-rebuild)"
+      echo "  Pulling latest base images only..."
+      $COMPOSE pull --ignore-pull-failures || true
+    fi
+    
+    echo "🚀 Starting containers..."
     $COMPOSE up -d
-    echo "✅ Containers deployed"
+    
+    echo ""
+    echo "✅ Deployment complete!"
+    echo "📊 Running containers:"
+    $COMPOSE ps --format "table {{.Names}}\t{{.Status}}"
   else
     echo "⚠️  No docker-compose.yml found; attempting a local Docker build..."
     docker build -t poly-trader .
