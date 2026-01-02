@@ -8,23 +8,44 @@ import { Settings, Save } from "lucide-react";
 export default function SettingsPanel() {
   const [settings, setSettings] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [versionInfo, setVersionInfo] = useState<any>(null);
 
   useEffect(() => {
+    // In Docker, client-side fetch to localhost:3030 works if port is exposed
     fetch("http://localhost:3030/api/settings")
       .then((res) => res.json())
       .then((data) => {
         setSettings(data);
         setLoading(false);
+      })
+      .catch(err => {
+        console.error("Failed to fetch settings", err);
+        // Mock data for UI preview if fetch fails
+        setSettings({
+            maxPositionSize: 50,
+            stopLossPercentage: 10,
+            takeProfitPercentage: 20,
+            enabledStrategies: ["arbitrage"]
+        });
+        setLoading(false);
       });
+
+      fetch("http://localhost:3030/api/version")
+        .then(res => res.json())
+        .then(data => setVersionInfo(data))
+        .catch(err => console.error("Failed to fetch version", err));
   }, []);
 
   const saveSettings = async () => {
-    await fetch("http://localhost:3030/api/settings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(settings),
-    });
-    // In a real app, show a toast notification here
+    try {
+        await fetch("http://localhost:3030/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(settings),
+        });
+    } catch (e) {
+        console.error("Save failed", e);
+    }
   };
 
   if (loading) return <GlassCard>Loading settings...</GlassCard>;
@@ -104,8 +125,23 @@ export default function SettingsPanel() {
             Save Changes
           </div>
         </LiquidButton>
+
+        <div className="text-center pt-4 space-y-1 border-t border-white/5 mt-4">
+            <div className="text-[10px] text-white/20 font-mono">
+                Frontend v{process.env.NEXT_PUBLIC_APP_VERSION || "0.0.0"}
+            </div>
+            {versionInfo && (
+                <div className="text-[10px] text-white/20 font-mono">
+                    Bot v{versionInfo.currentVersion}
+                    {versionInfo.hasUpdate && (
+                        <a href={versionInfo.downloadUrl} target="_blank" rel="noreferrer" className="block text-emerald-400 hover:text-emerald-300 mt-1 font-bold animate-pulse">
+                            Update Available: v{versionInfo.latestVersion}
+                        </a>
+                    )}
+                </div>
+            )}
+        </div>
       </div>
     </GlassCard>
   );
 }
-

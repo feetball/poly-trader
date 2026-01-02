@@ -11,7 +11,8 @@ export default function MarketScanner() {
     const fetchMarkets = () => {
       fetch("http://localhost:3030/api/markets")
         .then((res) => res.json())
-        .then((data) => setMarkets(data));
+        .then((data) => setMarkets(data))
+        .catch(() => setMarkets([]));
     };
 
     fetchMarkets();
@@ -76,4 +77,3 @@ export default function MarketScanner() {
     </GlassCard>
   );
 }
-
