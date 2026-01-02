@@ -43,8 +43,6 @@ def analyze_trades(trades):
     print(f"Analyzing {len(trades)} trades for {TARGET_USER}...")
     
     total_volume = 0
-    wins = 0
-    losses = 0
     
     for trade in trades:
         price = float(trade['price'])
