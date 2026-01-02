@@ -116,7 +116,7 @@ export class PositionManager {
 
         // Check Stop Loss
         const lossPct = (position.pnl / (position.shares * position.avgPrice)) * -100;
-        if (lossPct > this.riskLimits.stopLossPercentage) {
+        if (position.pnl < 0 && lossPct > this.riskLimits.stopLossPercentage) {
             console.log(`Stop Loss Triggered for ${position.title}: -${lossPct.toFixed(2)}%`);
             // In real bot, trigger sell order here
             this.closePosition(position.marketId, position.outcome, position.currentPrice);
