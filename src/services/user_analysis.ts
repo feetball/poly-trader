@@ -15,7 +15,7 @@ export class UserAnalysisService {
   private subgraphUrl = "https://api.thegraph.com/subgraphs/name/tokenunion/polymarket-matic";
 
   async getUserTrades(address: string): Promise<UserTrade[]> {
-    // Validate address format (Ethereum address: 0x followed by 40 hex characters)
+    // Validate address format to prevent injection attacks (Ethereum address: 0x followed by 40 hex characters)
     const addressPattern = /^0x[a-fA-F0-9]{40}$/;
     if (!addressPattern.test(address)) {
       console.error("Invalid address format:", address);
