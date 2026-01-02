@@ -2,6 +2,9 @@ import { PolymarketClient } from "./clients/polymarket";
 import { Strategy, StrategyContext } from "./strategies/base";
 import { ArbitrageStrategy } from "./strategies/arbitrage";
 import { VolumeSpikeStrategy } from "./strategies/volume";
+import { PositionManager, Position } from "./managers/position_manager";
+import { MarketDataStream } from "./clients/websocket";
+import { UserAnalysisService } from "./services/user_analysis";
 
 export interface BotSettings {
   minLiquidity: number;
