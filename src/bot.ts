@@ -14,16 +14,6 @@ export interface BotSettings {
   enabledStrategies: string[];
 }
 
-export interface Position {
-  marketId: string;
-  title: string;
-  outcome: "YES" | "NO";
-  shares: number;
-  avgPrice: number;
-  currentPrice: number;
-  pnl: number;
-}
-
 export interface ScannedMarket {
   id: string;
   question: string;
@@ -35,6 +25,9 @@ export interface ScannedMarket {
 export class Bot {
   private isRunning: boolean = false;
   private client: PolymarketClient;
+  private positionManager: PositionManager;
+  private marketStream: MarketDataStream;
+  private userAnalysis: UserAnalysisService;
   
   private settings: BotSettings = {
     minLiquidity: 10000,
@@ -46,11 +39,15 @@ export class Bot {
 
   private strategies: Strategy[] = [];
   private scannedMarkets: ScannedMarket[] = [];
-  private positions: Position[] = [];
+  // private positions: Position[] = []; // Removed in favor of PositionManager
 
   constructor(client: PolymarketClient) {
     this.client = client;
+    this.positionManager = new PositionManager(client);
+    this.marketStream = new MarketDataStream();
+    this.userAnalysis = new UserAnalysisService();
     this.initializeStrategies();
+    this.setupMarketStream();
   }
 
   private initializeStrategies() {
@@ -60,16 +57,27 @@ export class Bot {
     ];
   }
 
+  private setupMarketStream() {
+    this.marketStream.on('price_update', (event) => {
+      // Handle real-time price updates
+      // console.log('Price update:', event);
+      // Update position manager with new prices
+      // this.positionManager.updatePrices(...)
+    });
+  }
+
   async start() {
     if (this.isRunning) return;
     this.isRunning = true;
     console.log("Bot started...");
+    this.marketStream.connect();
     this.runLoop();
   }
 
   async stop() {
     this.isRunning = false;
     console.log("Bot stopping...");
+    // this.marketStream.disconnect();
   }
 
   getSettings() {
@@ -83,9 +91,9 @@ export class Bot {
   }
 
   getPortfolio() {
-    // In a real app, fetch from client/chain
-    // For now, return mock positions if empty
-    if (this.positions.length === 0) {
+    const positions = this.positionManager.getPositions();
+    if (positions.length === 0) {
+      // Return mock for UI demo if empty
       return [
         {
           marketId: "0x123...",
@@ -94,7 +102,8 @@ export class Bot {
           shares: 100,
           avgPrice: 0.45,
           currentPrice: 0.52,
-          pnl: 7.00
+          pnl: 7.00,
+          status: "OPEN"
         },
         {
           marketId: "0x456...",
@@ -103,15 +112,20 @@ export class Bot {
           shares: 50,
           avgPrice: 0.80,
           currentPrice: 0.75,
-          pnl: -2.50
+          pnl: -2.50,
+          status: "OPEN"
         }
       ] as Position[];
     }
-    return this.positions;
+    return positions;
   }
 
   getScannedMarkets() {
     return this.scannedMarkets;
+  }
+
+  async analyzeUser(address: string) {
+    return await this.userAnalysis.getUserTrades(address);
   }
 
   private async runLoop() {
@@ -131,17 +145,16 @@ export class Bot {
         // Map Gamma data to our internal structure
         if (Array.isArray(events)) {
             const markets: ScannedMarket[] = [];
+            const assetIdsToSubscribe: string[] = [];
             
             for (const event of events) {
-                // Gamma API returns events which contain markets
                 const eventMarkets = event.markets || [];
                 for (const m of eventMarkets) {
-                    // Try to parse probability from outcomePrices
                     let prob = 0.5;
                     try {
                         if (m.outcomePrices) {
                             const prices = JSON.parse(m.outcomePrices);
-                            prob = parseFloat(prices[0]); // Assume YES is index 0
+                            prob = parseFloat(prices[0]);
                         }
                     } catch (e) {}
 
@@ -150,11 +163,24 @@ export class Bot {
                         question: m.question,
                         volume: Number(m.volume) || 0,
                         probability: prob,
-                        tags: [event.slug?.split('-')[0] || "General"] // Simple tag extraction
+                        tags: [event.slug?.split('-')[0] || "General"]
                     });
+
+                    // Collect asset IDs for WS subscription
+                    if (m.clobTokenIds) {
+                      try {
+                        const tokens = JSON.parse(m.clobTokenIds);
+                        assetIdsToSubscribe.push(...tokens);
+                      } catch(e) {}
+                    }
                 }
             }
-            this.scannedMarkets = markets.slice(0, 20); // Keep top 20
+            this.scannedMarkets = markets.slice(0, 20);
+            
+            // Subscribe to top markets for real-time updates
+            if (assetIdsToSubscribe.length > 0) {
+              this.marketStream.subscribe(assetIdsToSubscribe.slice(0, 50));
+            }
         }
 
         // 2. Run Strategies
@@ -171,7 +197,18 @@ export class Bot {
                 if (opportunities.length > 0) {
                     console.log(`Found ${opportunities.length} opportunities via ${strategy.name}`);
                     // Execute trades here...
-                    // For now, we could add them to a "Signals" list if we had one
+                    // For now, we simulate a trade for the first opportunity to populate the portfolio
+                    if (this.positionManager.getPositions().length === 0 && Math.random() > 0.8) {
+                       const opp = opportunities[0];
+                       this.positionManager.addPosition(
+                         opp.marketId,
+                         opp.question || "Unknown Market",
+                         opp.outcome as "YES" | "NO",
+                         100,
+                         opp.price
+                       );
+                       console.log("Executed simulated trade:", opp);
+                    }
                 }
             }
         }
