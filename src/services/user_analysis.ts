@@ -3,7 +3,8 @@ import axios from "axios";
 export interface UserTrade {
   id: string;
   marketId: string;
-  outcome: string;
+  question: string;
+  outcomeIndex: number;
   price: number;
   size: number;
   timestamp: number;
@@ -11,13 +12,17 @@ export interface UserTrade {
 }
 
 export class UserAnalysisService {
-  private subgraphUrl = "https://api.thegraph.com/subgraphs/name/tokenunion/polymarket-matic"; // Example URL
+  private subgraphUrl = "https://api.thegraph.com/subgraphs/name/tokenunion/polymarket-matic";
 
   async getUserTrades(address: string): Promise<UserTrade[]> {
-    // GraphQL query to fetch trades
     const query = `
       {
-        transactions(where: { user: "${address.toLowerCase()}" }, orderBy: timestamp, orderDirection: desc, first: 100) {
+        transactions(
+          where: { user: "${address.toLowerCase()}" }
+          orderBy: timestamp
+          orderDirection: desc
+          first: 50
+        ) {
           id
           market {
             id
@@ -33,22 +38,19 @@ export class UserAnalysisService {
     `;
 
     try {
-      // Mock response for now as we don't have the exact subgraph schema handy
-      // const response = await axios.post(this.subgraphUrl, { query });
-      // return this.parseTrades(response.data);
+      const response = await axios.post(this.subgraphUrl, { query });
+      const data = response.data?.data?.transactions || [];
       
-      console.log(`Fetching trades for ${address}...`);
-      return [
-        {
-          id: "0x1",
-          marketId: "0x123",
-          outcome: "YES",
-          price: 0.55,
-          size: 1000,
-          timestamp: Date.now() - 10000,
-          type: "BUY"
-        }
-      ];
+      return data.map((t: any) => ({
+        id: t.id,
+        marketId: t.market.id,
+        question: t.market.question,
+        outcomeIndex: Number(t.outcomeIndex),
+        price: Number(t.price),
+        size: Number(t.amount),
+        timestamp: Number(t.timestamp),
+        type: t.type.toUpperCase()
+      }));
     } catch (error) {
       console.error("Error fetching user trades:", error);
       return [];
@@ -56,15 +58,26 @@ export class UserAnalysisService {
   }
 
   analyzePattern(trades: UserTrade[]) {
-    // Simple pattern recognition
-    const winRate = 0.65; // Mock calculation
-    const avgSize = trades.reduce((acc, t) => acc + t.size, 0) / trades.length;
+    if (trades.length === 0) return null;
+
+    const totalVolume = trades.reduce((acc, t) => acc + (t.price * t.size), 0);
+    const avgSize = totalVolume / trades.length;
     
+    // Count frequency of trades by hour to find timing patterns
+    const hourCounts = new Array(24).fill(0);
+    trades.forEach(t => {
+        const hour = new Date(t.timestamp * 1000).getHours();
+        hourCounts[hour]++;
+    });
+    const peakHour = hourCounts.indexOf(Math.max(...hourCounts));
+
     return {
-      winRate,
+      totalTrades: trades.length,
+      totalVolume,
       avgSize,
-      favoriteCategory: "Politics", // Mock
-      riskScore: "HIGH"
+      peakTradingHour: peakHour,
+      lastActive: trades[0].timestamp,
+      riskScore: avgSize > 1000 ? "HIGH" : "LOW"
     };
   }
 }
