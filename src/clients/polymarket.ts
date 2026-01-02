@@ -59,16 +59,16 @@ export class PolymarketClient {
     }
   }
 
-  getApiCallsPerMinute(): number {
-    this.recordApiCall();
-    // recordApiCall() adds one, which we don't want for reads.
-    // Remove the last entry we just added.
-    this.apiCallTimestamps.pop();
-    const now = Date.now();
+  private pruneApiCalls(now: number) {
     const cutoff = now - 60_000;
     while (this.apiCallTimestamps.length > 0 && this.apiCallTimestamps[0] < cutoff) {
       this.apiCallTimestamps.shift();
     }
+  }
+
+  getApiCallsPerMinute(): number {
+    const now = Date.now();
+    this.pruneApiCalls(now);
     return this.apiCallTimestamps.length;
   }
 

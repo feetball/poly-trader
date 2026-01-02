@@ -135,6 +135,13 @@ export default function SettingsPanel() {
       : 5
   );
 
+  const updownHoldMinutes = Math.max(
+    1,
+    Number.isFinite(Number(settings?.updownHoldMs))
+      ? Number(settings.updownHoldMs) / 60000
+      : 15
+  );
+
   return (
     <GlassCard>
       <div className="flex items-center gap-2 mb-6">
@@ -143,6 +150,27 @@ export default function SettingsPanel() {
       </div>
       
       <div className="space-y-5">
+        <div>
+          <label className="block text-xs font-medium text-white/60 mb-1.5 uppercase tracking-wider">Up/Down Hold (minutes)</label>
+          <input
+            type="number"
+            step="1"
+            min="1"
+            max="60"
+            value={updownHoldMinutes}
+            onChange={(e) => {
+              if (!settings) return;
+              const minutes = Number(e.target.value);
+              const ms = Math.max(60_000, Math.round((Number.isFinite(minutes) ? minutes : 15) * 60_000));
+              setSettings({ ...settings, updownHoldMs: ms });
+            }}
+            className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-blue-500/50 transition-colors"
+          />
+          <div className="text-[10px] text-white/30 mt-1">
+            Positions opened by up/down auto-close after this time.
+          </div>
+        </div>
+
         <div>
           <label className="block text-xs font-medium text-white/60 mb-1.5 uppercase tracking-wider">Scan Interval (seconds)</label>
           <input

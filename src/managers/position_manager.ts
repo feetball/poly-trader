@@ -9,12 +9,16 @@ export interface Position {
   currentPrice: number;
   pnl: number;
   status: "OPEN" | "CLOSED";
+  openedAt?: number;
+  closeAt?: number;
+  strategy?: string;
 }
 
 export interface RiskLimits {
   maxPositionSize: number; // Max USDC per position
   maxPortfolioExposure: number; // Max total USDC exposed
   stopLossPercentage: number; // Max loss % before auto-close
+  takeProfitPercentage: number; // Take profit % before auto-close
   dailyLossLimit: number; // Max daily loss
 }
 
@@ -25,6 +29,7 @@ export class PositionManager {
     maxPositionSize: 50,
     maxPortfolioExposure: 500,
     stopLossPercentage: 15,
+    takeProfitPercentage: 20,
     dailyLossLimit: 100
   };
   private dailyPnL: number = 0;
@@ -127,6 +132,25 @@ export class PositionManager {
     return true;
   }
 
+  hasOpenPosition(marketId: string, outcome: "YES" | "NO"): boolean {
+    const key = `${marketId}-${outcome}`;
+    const p = this.positions.get(key);
+    return !!p && p.status === "OPEN" && p.shares > 0;
+  }
+
+  setPositionMeta(
+    marketId: string,
+    outcome: "YES" | "NO",
+    meta: { openedAt?: number; closeAt?: number; strategy?: string }
+  ) {
+    const key = `${marketId}-${outcome}`;
+    const p = this.positions.get(key);
+    if (!p) return;
+    if (meta.openedAt !== undefined) p.openedAt = meta.openedAt;
+    if (meta.closeAt !== undefined) p.closeAt = meta.closeAt;
+    if (meta.strategy !== undefined) p.strategy = meta.strategy;
+  }
+
   updatePrices(marketPrices: Map<string, number>) {
     for (const [key, position] of this.positions) {
       if (position.status === "CLOSED") continue;
@@ -141,6 +165,16 @@ export class PositionManager {
         position.currentPrice = price;
         position.pnl = (position.currentPrice - position.avgPrice) * position.shares;
 
+        // Take profit
+        if (position.pnl > 0) {
+          const gainPct = (position.pnl / (position.shares * position.avgPrice)) * 100;
+          if (gainPct >= this.riskLimits.takeProfitPercentage) {
+            console.log(`Take Profit Triggered for ${position.title}: +${gainPct.toFixed(2)}%`);
+            this.closePosition(position.marketId, position.outcome, position.currentPrice);
+            continue;
+          }
+        }
+
         // Check Stop Loss only when position is at a loss
         if (position.pnl < 0) {
           const lossPct = Math.abs((position.pnl / (position.shares * position.avgPrice)) * 100);
@@ -152,6 +186,20 @@ export class PositionManager {
         }
       }
     }
+  }
+
+  closeExpiredPositions(now: number) {
+    let closed = 0;
+    for (const position of this.positions.values()) {
+      if (position.status !== "OPEN" || position.shares <= 0) continue;
+      if (typeof position.closeAt !== "number") continue;
+      if (now >= position.closeAt) {
+        const price = Number.isFinite(position.currentPrice) ? position.currentPrice : position.avgPrice;
+        this.closePosition(position.marketId, position.outcome, price);
+        closed++;
+      }
+    }
+    return closed;
   }
 
   closePosition(marketId: string, outcome: "YES" | "NO", price: number) {

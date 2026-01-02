@@ -53,16 +53,21 @@ export class MarketDataStream extends EventEmitter {
       return;
     }
 
+    const newAssetIds = assetIds.filter((id) => !this.subscriptions.has(id));
+    if (newAssetIds.length === 0) {
+      return;
+    }
+
     // Polymarket CLOB WSS expects `assets_ids` and channel `type` for market subscriptions.
     const msg = {
-      assets_ids: assetIds,
+      assets_ids: newAssetIds,
       type: this.channelType,
       operation: "subscribe",
     };
     
     this.ws.send(JSON.stringify(msg));
-    assetIds.forEach(id => this.subscriptions.add(id));
-    console.log(`Subscribed to ${assetIds.length} assets`);
+    newAssetIds.forEach(id => this.subscriptions.add(id));
+    console.log(`Subscribed to ${newAssetIds.length} assets`);
   }
 
   private resubscribe() {

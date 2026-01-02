@@ -7,7 +7,8 @@ export class UpDown15Strategy extends Strategy {
 
   private priceHistory: Map<string, { ts: number; price: number }[]> = new Map();
   private readonly WINDOW_MS = 15 * 60 * 1000; // 15 minutes
-  private readonly MIN_PERCENT_CHANGE = 0.03; // 3%
+  private readonly MIN_PERCENT_CHANGE = 0.03; // 3% per 15 minutes (normalized)
+  private readonly MIN_EVAL_MS = 60 * 1000; // need at least 1 minute of data
 
   async analyze(context: StrategyContext): Promise<MarketOpportunity[]> {
     const opportunities: MarketOpportunity[] = [];
@@ -44,30 +45,34 @@ export class UpDown15Strategy extends Strategy {
             if (hist.length > 200) hist.splice(0, hist.length - 200);
             this.priceHistory.set(market.id, hist);
 
-            // Need at least two points and oldest older than WINDOW_MS to evaluate
+            // Need at least two points to evaluate
             if (hist.length < 2) continue;
             const oldest = hist[0];
             const latest = hist[hist.length - 1];
 
             const elapsed = latest.ts - oldest.ts;
-            if (elapsed < this.WINDOW_MS * 0.9) continue; // ensure ~15min window
+            if (elapsed < this.MIN_EVAL_MS) continue;
 
             const percentChange = (latest.price - oldest.price) / (oldest.price || 1);
             const absChange = Math.abs(percentChange);
 
+            // Normalize to a 15-minute equivalent move so we can act before 15 minutes has elapsed.
+            // Example: a 1% move in 5 minutes ~= 3% move in 15 minutes.
+            const normalizedAbsChange = absChange * (this.WINDOW_MS / Math.max(1, elapsed));
+
             const volume24hr = Number(market.volume24hr) || 0;
             const minVolume = Number(context.settings?.minLiquidity) || 1000;
 
-            if (absChange >= this.MIN_PERCENT_CHANGE && volume24hr >= Math.min(1000, minVolume / 10)) {
+            if (normalizedAbsChange >= this.MIN_PERCENT_CHANGE && volume24hr >= Math.min(1000, minVolume / 10)) {
               const outcome = percentChange > 0 ? "YES" : "NO";
 
               // Size heuristics: proportionate to strength but capped by maxPositionSize
-              const baseSize = Math.max(5, Math.round(absChange * 100));
+              const baseSize = Math.max(5, Math.round(normalizedAbsChange * 100));
               const maxSize = Number(context.settings?.maxPositionSize) || 10;
               const size = Math.min(maxSize, baseSize);
 
-              const confidence = Math.min(1, absChange / 0.1); // 10% move => confidence 1
-              const signalStrength = Math.round(absChange * 1000);
+              const confidence = Math.min(1, normalizedAbsChange / 0.1); // 10%/15m move => confidence 1
+              const signalStrength = Math.round(normalizedAbsChange * 1000);
 
               opportunities.push({
                 marketId: market.id,
@@ -79,11 +84,12 @@ export class UpDown15Strategy extends Strategy {
                 confidence: confidence,
                 signalStrength: signalStrength,
                 timestamp: Date.now(),
-                reason: `15min ${percentChange > 0 ? "UP" : "DOWN"} ${(percentChange * 100).toFixed(2)}%`,
+                reason: `${Math.round(elapsed / 60000)}m ${percentChange > 0 ? "UP" : "DOWN"} ${(percentChange * 100).toFixed(2)}% (norm ${(normalizedAbsChange * 100).toFixed(2)}%/15m)`,
                 metadata: {
                   oldestPrice: oldest.price,
                   latestPrice: latest.price,
                   percentChange,
+                  normalizedAbsChange,
                   elapsedMs: elapsed,
                   volume24hr,
                 },
