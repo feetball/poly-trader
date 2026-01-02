@@ -1,12 +1,13 @@
 import requests
-import json
-import time
 import os
 from datetime import datetime
 
 # Configuration
 TARGET_USER = os.getenv("POLYMARKET_TARGET_USER", "0x790A4485e5198763C0a34272698ed0cd9506949B") # Example whale
 SUBGRAPH_URL = "https://api.thegraph.com/subgraphs/name/tokenunion/polymarket-matic"
+
+# Timestamp threshold to detect milliseconds (timestamps after year 2286 in seconds)
+MILLISECOND_THRESHOLD = 10000000000
 
 def fetch_user_trades(user_address):
     query = """
@@ -58,10 +59,10 @@ def analyze_trades(trades):
         try:
             timestamp = int(trade['timestamp'])
             # Check if timestamp is in milliseconds (convert to seconds if so)
-            if timestamp > 10000000000:  # Timestamps after year 2286 in seconds, likely milliseconds
+            if timestamp > MILLISECOND_THRESHOLD:
                 timestamp = timestamp // 1000
             trade_time = datetime.fromtimestamp(timestamp)
-        except (ValueError, TypeError, OSError) as e:
+        except (ValueError, TypeError, OSError):
             # If conversion fails, use a placeholder
             trade_time = "Invalid timestamp"
         
