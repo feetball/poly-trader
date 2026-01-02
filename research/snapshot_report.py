@@ -37,6 +37,30 @@ def fetch_user_trades(user_address):
         print(f"Error fetching data: {response.status_code}")
         return []
 
+def convert_timestamp(timestamp_value):
+    """
+    Convert a timestamp to datetime, handling various formats.
+    
+    Args:
+        timestamp_value: The timestamp value (can be string, int, or float)
+        
+    Returns:
+        datetime object or None if conversion fails
+    """
+    try:
+        # Convert to integer first
+        timestamp = int(float(timestamp_value))
+        
+        # Check if timestamp is in milliseconds (typical for JS timestamps)
+        # Timestamps after year 2286 in seconds would be > 10^10
+        if timestamp > 10**10:
+            timestamp = timestamp // 1000
+        
+        return datetime.fromtimestamp(timestamp)
+    except (ValueError, TypeError, OSError) as e:
+        print(f"Warning: Could not convert timestamp '{timestamp_value}': {e}")
+        return None
+
 def analyze_trades(trades):
     print(f"Analyzing {len(trades)} trades for {TARGET_USER}...")
     
@@ -53,7 +77,9 @@ def analyze_trades(trades):
         # Simple heuristic: If they bought low and it's a recent trade, we don't know outcome yet
         # But we can see their average entry price
         
-        print(f"[{datetime.fromtimestamp(int(trade['timestamp']))}] {trade['type']} {amount:.2f} shares @ {price:.2f} - {trade['market']['question'][:50]}...")
+        timestamp_dt = convert_timestamp(trade['timestamp'])
+        timestamp_str = timestamp_dt.strftime('%Y-%m-%d %H:%M:%S') if timestamp_dt else 'Unknown'
+        print(f"[{timestamp_str}] {trade['type']} {amount:.2f} shares @ {price:.2f} - {trade['market']['question'][:50]}...")
 
     print(f"\nTotal Volume Traded: ${total_volume:.2f}")
 
