@@ -14,6 +14,7 @@ export interface BotSettings {
   maxPositionSize: number;
   stopLossPercentage: number;
   takeProfitPercentage: number;
+  scanIntervalMs: number;
   enabledStrategies: string[];
 }
 
@@ -39,6 +40,7 @@ export class Bot {
     maxPositionSize: 50, // USDC
     stopLossPercentage: 10,
     takeProfitPercentage: 20,
+    scanIntervalMs: 5000,
     enabledStrategies: ["arbitrage", "volume_spike", "updown_15"]
   };
 
@@ -103,6 +105,10 @@ export class Bot {
         Number.isFinite(input.takeProfitPercentage)
       ) {
         out.takeProfitPercentage = Math.max(0, input.takeProfitPercentage);
+      }
+      if (typeof input.scanIntervalMs === "number" && Number.isFinite(input.scanIntervalMs)) {
+        // Avoid hammering external APIs; keep within a sane range.
+        out.scanIntervalMs = Math.max(1000, Math.min(5 * 60 * 1000, input.scanIntervalMs));
       }
       if (Array.isArray(input.enabledStrategies)) {
         out.enabledStrategies = input.enabledStrategies
@@ -333,11 +339,12 @@ export class Bot {
             }
         }
 
-        // Sleep for 5 seconds
-        await new Promise(resolve => setTimeout(resolve, 5000));
+        const sleepMs = Math.max(1000, Number(this.settings.scanIntervalMs) || 5000);
+        await new Promise((resolve) => setTimeout(resolve, sleepMs));
       } catch (error) {
         console.error("Error in bot loop:", error);
-        await new Promise(resolve => setTimeout(resolve, 5000));
+        const sleepMs = Math.max(1000, Number(this.settings.scanIntervalMs) || 5000);
+        await new Promise((resolve) => setTimeout(resolve, sleepMs));
       }
     }
   }

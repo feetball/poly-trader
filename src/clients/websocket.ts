@@ -23,7 +23,13 @@ export class MarketDataStream extends EventEmitter {
 
     this.ws.on('message', (data: WebSocket.Data) => {
       try {
-        const message = JSON.parse(data.toString());
+        const raw = data.toString();
+        const trimmed = raw.trim();
+        // Server sometimes sends plain-text control messages.
+        if (!trimmed) return;
+        if (trimmed === "PONG" || trimmed === "NO NEW ASSETS") return;
+        if (!(trimmed.startsWith("{") || trimmed.startsWith("["))) return;
+        const message = JSON.parse(trimmed);
         this.handleMessage(message);
       } catch (e) {
         console.error('Error parsing WS message:', e);

@@ -128,6 +128,13 @@ export default function SettingsPanel() {
 
   if (loading || !settings) return <GlassCard>Loading settings...</GlassCard>;
 
+  const scanIntervalSeconds = Math.max(
+    1,
+    Number.isFinite(Number(settings?.scanIntervalMs))
+      ? Number(settings.scanIntervalMs) / 1000
+      : 5
+  );
+
   return (
     <GlassCard>
       <div className="flex items-center gap-2 mb-6">
@@ -136,6 +143,26 @@ export default function SettingsPanel() {
       </div>
       
       <div className="space-y-5">
+        <div>
+          <label className="block text-xs font-medium text-white/60 mb-1.5 uppercase tracking-wider">Scan Interval (seconds)</label>
+          <input
+            type="number"
+            step="0.5"
+            min="1"
+            value={scanIntervalSeconds}
+            onChange={(e) => {
+              if (!settings) return;
+              const seconds = Number(e.target.value);
+              const ms = Math.max(1000, Math.round((Number.isFinite(seconds) ? seconds : 5) * 1000));
+              setSettings({ ...settings, scanIntervalMs: ms });
+            }}
+            className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-blue-500/50 transition-colors"
+          />
+          <div className="text-[10px] text-white/30 mt-1">
+            Lower values increase API usage.
+          </div>
+        </div>
+
         <div>
           <label className="block text-xs font-medium text-white/60 mb-1.5 uppercase tracking-wider">Max Position (USDC)</label>
           <input

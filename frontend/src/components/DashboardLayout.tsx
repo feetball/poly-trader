@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { GlassCard } from "./ui/GlassCard";
 import { LiquidButton } from "./ui/LiquidButton";
-import { Activity, Power, Terminal } from "lucide-react";
+import { Activity, Gauge, Power, Terminal } from "lucide-react";
 import { API_BASE } from "../lib/api";
 import SideNav from "./SideNav";
 
@@ -15,6 +15,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [status, setStatus] = useState<any>({ status: "unknown" });
   const [toggling, setToggling] = useState(false);
   const [version, setVersion] = useState<string>("loading...");
+  const [metrics, setMetrics] = useState<any>(null);
 
   const refreshStatus = async () => {
     try {
@@ -36,14 +37,27 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     }
   };
 
+  const refreshMetrics = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/metrics`, { cache: "no-store" });
+      const data = await res.json();
+      setMetrics(data);
+    } catch {
+      setMetrics(null);
+    }
+  };
+
   useEffect(() => {
     refreshStatus();
     refreshVersion();
+    refreshMetrics();
     const iv = setInterval(refreshStatus, 5000);
     const versionIv = setInterval(refreshVersion, 60000); // check version every minute
+    const metricsIv = setInterval(refreshMetrics, 5000);
     return () => {
       clearInterval(iv);
       clearInterval(versionIv);
+      clearInterval(metricsIv);
     };
   }, []);
 
@@ -68,7 +82,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-500/10 rounded-full blur-[120px]" />
       </div>
 
-      <div className="relative z-10 container mx-auto px-6 py-8">
+      <div className="relative z-10 container mx-auto px-6 py-8 pb-20">
         {/* Header */}
         <header className="flex items-center justify-between mb-12">
           <div className="flex items-center gap-4">
@@ -114,6 +128,27 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-6">
           <SideNav status={status} />
           <main className="min-w-0">{children}</main>
+        </div>
+      </div>
+
+      {/* Bottom Status Bar */}
+      <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-white/10 bg-black/40 backdrop-blur-md">
+        <div className="container mx-auto px-6 py-3 flex items-center justify-between gap-4 text-xs text-white/60">
+          <div className="flex items-center gap-2">
+            <Gauge className="w-4 h-4 text-blue-400" />
+            <span className="font-mono">
+              API/min: {typeof metrics?.apiCallsPerMinute === "number" ? metrics.apiCallsPerMinute : "--"}
+            </span>
+            <span className="text-white/20">|</span>
+            <span className="font-mono">
+              Scan: {typeof metrics?.scanIntervalMs === "number" ? (metrics.scanIntervalMs / 1000).toFixed(1) : "--"}s
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className={`w-2 h-2 rounded-full ${status.status === 'running' ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+            <span className="uppercase tracking-widest">{status.status === 'running' ? 'Online' : 'Offline'}</span>
+          </div>
         </div>
       </div>
     </div>

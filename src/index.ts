@@ -154,6 +154,19 @@ app.post("/api/settings", (req, res) => {
   res.json(updated);
 });
 
+app.get("/api/metrics", (req, res) => {
+  try {
+    const settings = bot.getSettings();
+    res.json({
+      apiCallsPerMinute: client.getApiCallsPerMinute(),
+      scanIntervalMs: Number(settings.scanIntervalMs) || 5000,
+      ts: Date.now(),
+    });
+  } catch (e) {
+    res.status(500).json({ error: "Failed to compute metrics" });
+  }
+});
+
 app.get("/api/portfolio", (req, res) => {
   res.json(bot.getPortfolio());
 });

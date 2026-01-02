@@ -12,6 +12,7 @@ export class PolymarketClient {
   private paperTrading: boolean = false;
   private paperBalance: number = 1000; // Fake USDC balance
   private gammaApiUrl = "https://gamma-api.polymarket.com"; // Gamma API Endpoint
+  private apiCallTimestamps: number[] = [];
 
   constructor(privateKey?: string, paperTrading: boolean = false) {
     this.paperTrading = paperTrading;
@@ -44,9 +45,37 @@ export class PolymarketClient {
     }
   }
 
+  private recordApiCall() {
+    const now = Date.now();
+    this.apiCallTimestamps.push(now);
+    // prune older than 60s
+    const cutoff = now - 60_000;
+    while (this.apiCallTimestamps.length > 0 && this.apiCallTimestamps[0] < cutoff) {
+      this.apiCallTimestamps.shift();
+    }
+    // keep bounded even if time jumps
+    if (this.apiCallTimestamps.length > 100_000) {
+      this.apiCallTimestamps.splice(0, this.apiCallTimestamps.length - 100_000);
+    }
+  }
+
+  getApiCallsPerMinute(): number {
+    this.recordApiCall();
+    // recordApiCall() adds one, which we don't want for reads.
+    // Remove the last entry we just added.
+    this.apiCallTimestamps.pop();
+    const now = Date.now();
+    const cutoff = now - 60_000;
+    while (this.apiCallTimestamps.length > 0 && this.apiCallTimestamps[0] < cutoff) {
+      this.apiCallTimestamps.shift();
+    }
+    return this.apiCallTimestamps.length;
+  }
+
   // --- Gamma API (Market Data) ---
   async getGammaMarkets(params: any = {}) {
     try {
+      this.recordApiCall();
       const response = await axios.get(`${this.gammaApiUrl}/events`, { params });
       return response.data;
     } catch (error) {
@@ -58,11 +87,13 @@ export class PolymarketClient {
   // --- CLOB API (Trading) ---
   async getMarkets(nextCursor?: string) {
     if (!this.client) throw new Error("Client not initialized");
+    this.recordApiCall();
     return await this.client.getMarkets(nextCursor);
   }
 
   async getOrderBook(tokenId: string) {
     if (!this.client) throw new Error("Client not initialized");
+    this.recordApiCall();
     return await this.client.getOrderBook(tokenId);
   }
 
@@ -79,6 +110,7 @@ export class PolymarketClient {
       };
     }
 
+    this.recordApiCall();
     return await this.client.createOrder({
       tokenID: tokenId,
       price: price,

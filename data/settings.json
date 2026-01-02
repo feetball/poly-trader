@@ -1,9 +1,9 @@
 {
   "minLiquidity": 10000,
-  "maxPositionSize": 123,
-  "stopLossPercentage": 10,
-  "takeProfitPercentage": 20,
+  "maxPositionSize": 500,
+  "stopLossPercentage": 1,
+  "takeProfitPercentage": 3,
   "enabledStrategies": [
-    "arbitrage"
+    "updown_15"
   ]
 }
