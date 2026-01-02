@@ -10,21 +10,36 @@ export default function SettingsPanel() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // In Docker, client-side fetch to localhost:3030 works if port is exposed
     fetch("http://localhost:3030/api/settings")
       .then((res) => res.json())
       .then((data) => {
         setSettings(data);
         setLoading(false);
+      })
+      .catch(err => {
+        console.error("Failed to fetch settings", err);
+        // Mock data for UI preview if fetch fails
+        setSettings({
+            maxPositionSize: 50,
+            stopLossPercentage: 10,
+            takeProfitPercentage: 20,
+            enabledStrategies: ["arbitrage"]
+        });
+        setLoading(false);
       });
   }, []);
 
   const saveSettings = async () => {
-    await fetch("http://localhost:3030/api/settings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(settings),
-    });
-    // In a real app, show a toast notification here
+    try {
+        await fetch("http://localhost:3030/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(settings),
+        });
+    } catch (e) {
+        console.error("Save failed", e);
+    }
   };
 
   if (loading) return <GlassCard>Loading settings...</GlassCard>;
@@ -108,4 +123,3 @@ export default function SettingsPanel() {
     </GlassCard>
   );
 }
-

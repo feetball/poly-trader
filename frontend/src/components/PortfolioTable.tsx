@@ -11,7 +11,8 @@ export default function PortfolioTable() {
     const fetchPortfolio = () => {
       fetch("http://localhost:3030/api/portfolio")
         .then((res) => res.json())
-        .then((data) => setPositions(data));
+        .then((data) => setPositions(data))
+        .catch(() => setPositions([]));
     };
 
     fetchPortfolio();
@@ -79,4 +80,3 @@ export default function PortfolioTable() {
     </GlassCard>
   );
 }
-
