@@ -136,12 +136,14 @@ export class PositionManager {
         position.currentPrice = price;
         position.pnl = (position.currentPrice - position.avgPrice) * position.shares;
 
-        // Check Stop Loss
-        const lossPct = (position.pnl / (position.shares * position.avgPrice)) * -100;
-        if (position.pnl < 0 && lossPct > this.riskLimits.stopLossPercentage) {
+        // Check Stop Loss only when position is at a loss
+        if (position.pnl < 0) {
+          const lossPct = Math.abs((position.pnl / (position.shares * position.avgPrice)) * 100);
+          if (lossPct > this.riskLimits.stopLossPercentage) {
             console.log(`Stop Loss Triggered for ${position.title}: -${lossPct.toFixed(2)}%`);
             // In real bot, trigger sell order here
             this.closePosition(position.marketId, position.outcome, position.currentPrice);
+          }
         }
       }
     }
