@@ -41,16 +41,25 @@ export class UserAnalysisService {
       const response = await axios.post(this.subgraphUrl, { query });
       const data = response.data?.data?.transactions || [];
       
-      return data.map((t: any) => ({
-        id: t.id,
-        marketId: t.market.id,
-        question: t.market.question,
-        outcomeIndex: Number(t.outcomeIndex),
-        price: Number(t.price),
-        size: Number(t.amount),
-        timestamp: Number(t.timestamp),
-        type: t.type?.toUpperCase() || 'UNKNOWN'
-      }));
+      return data.map((t: any) => {
+        const validType = t.type?.toUpperCase();
+        const type = (validType === 'BUY' || validType === 'SELL') ? validType : 'UNKNOWN';
+        
+        if (type === 'UNKNOWN') {
+          console.warn(`Unknown trade type for transaction ${t.id}:`, t.type);
+        }
+        
+        return {
+          id: t.id,
+          marketId: t.market.id,
+          question: t.market.question,
+          outcomeIndex: Number(t.outcomeIndex),
+          price: Number(t.price),
+          size: Number(t.amount),
+          timestamp: Number(t.timestamp),
+          type
+        };
+      });
     } catch (error) {
       console.error("Error fetching user trades:", error);
       return [];
