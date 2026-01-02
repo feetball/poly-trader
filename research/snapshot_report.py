@@ -46,15 +46,21 @@ def convert_timestamp(timestamp_value):
         
     Returns:
         datetime object or None if conversion fails
+    
+    Notes:
+        - Handles both second and millisecond precision timestamps
+        - Assumes timestamps > 1e12 (Sep 2001 in milliseconds) are in milliseconds
+        - Preserves fractional seconds when provided
     """
     try:
-        # Convert to integer first
-        timestamp = int(float(timestamp_value))
+        # Convert to float to preserve fractional seconds
+        timestamp = float(timestamp_value)
         
-        # Check if timestamp is in milliseconds (typical for JS timestamps)
-        # Timestamps after year 2286 in seconds would be > 10^10
-        if timestamp > 10**10:
-            timestamp = timestamp // 1000
+        # Check if timestamp is in milliseconds
+        # Use 1e12 as threshold (corresponds to ~Sep 2001 if milliseconds, ~year 31688 if seconds)
+        # All realistic timestamps after year 2001 in milliseconds will be > 1e12
+        if timestamp > 1e12:
+            timestamp = timestamp / 1000.0
         
         return datetime.fromtimestamp(timestamp)
     except (ValueError, TypeError, OSError) as e:
