@@ -1,6 +1,6 @@
 {
   "name": "poly-trader",
-  "version": "0.1.1-beta",
+  "version": "0.1.1",
   "description": "",
   "main": "index.js",
   "scripts": {
