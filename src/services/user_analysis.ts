@@ -49,7 +49,7 @@ export class UserAnalysisService {
         price: Number(t.price),
         size: Number(t.amount),
         timestamp: Number(t.timestamp),
-        type: t.type.toUpperCase()
+        type: t.type?.toUpperCase() || 'UNKNOWN'
       }));
     } catch (error) {
       console.error("Error fetching user trades:", error);
