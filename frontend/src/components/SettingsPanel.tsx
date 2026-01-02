@@ -10,17 +10,24 @@ export default function SettingsPanel() {
   const [settings, setSettings] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [versionInfo, setVersionInfo] = useState<any>(null);
+  const [checking, setChecking] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch(`${API_BASE}/api/settings`)
-      .then((res) => res.json())
-      .then((data) => {
+    let mounted = true;
+
+    const fetchSettings = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/settings`);
+        const data = await res.json();
+        if (!mounted) return;
         setSettings(data);
         setLoading(false);
-      })
-      .catch(err => {
+      } catch (err) {
         console.error("Failed to fetch settings", err);
         // Mock data for UI preview if fetch fails
+        if (!mounted) return;
         setSettings({
             maxPositionSize: 50,
             stopLossPercentage: 10,
@@ -28,23 +35,59 @@ export default function SettingsPanel() {
             enabledStrategies: ["arbitrage"]
         });
         setLoading(false);
-      });
+      }
+    };
 
-      fetch(`${API_BASE}/api/version`)
-        .then(res => res.json())
-        .then(data => setVersionInfo(data))
-        .catch(err => console.error("Failed to fetch version", err));
+    const fetchVersion = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/version`);
+        const data = await res.json();
+        if (!mounted) return;
+        setVersionInfo(data);
+      } catch (err) {
+        console.error("Failed to fetch version", err);
+      }
+    };
+
+    fetchSettings();
+    fetchVersion();
+
+    // Poll for version updates every 60s
+    const iv = setInterval(fetchVersion, 60 * 1000);
+
+    return () => { mounted = false; clearInterval(iv); };
   }, []);
 
-  const saveSettings = async () => {
+  const checkForUpdates = async () => {
+    setChecking(true);
     try {
-        await fetch(`${API_BASE}/api/settings`, {
+      const res = await fetch(`${API_BASE}/api/check-update`, { method: "POST" });
+      const data = await res.json();
+      setVersionInfo((prev: any) => ({ ...(prev || {}), ...data }));
+    } catch (e) {
+      console.error("Update check failed", e);
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  const saveSettings = async () => {
+    setSaving(true);
+    setSaveStatus(null);
+    try {
+        const res = await fetch(`${API_BASE}/api/settings`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(settings),
         });
+        const updated = await res.json();
+        setSettings(updated);
+        setSaveStatus("Saved");
     } catch (e) {
         console.error("Save failed", e);
+        setSaveStatus("Save failed");
+    } finally {
+        setSaving(false);
     }
   };
 
@@ -119,25 +162,38 @@ export default function SettingsPanel() {
           </div>
         </div>
 
-        <LiquidButton onClick={saveSettings} className="w-full mt-2">
+        <LiquidButton onClick={saveSettings} className="w-full mt-2" disabled={saving}>
           <div className="flex items-center justify-center gap-2">
             <Save className="w-4 h-4" />
-            Save Changes
+            {saving ? "Saving..." : "Save Changes"}
           </div>
         </LiquidButton>
+
+        {saveStatus && (
+          <div className="text-xs text-white/40 text-center">{saveStatus}</div>
+        )}
 
         <div className="text-center pt-4 space-y-1 border-t border-white/5 mt-4">
             <div className="text-[10px] text-white/20 font-mono">
                 Frontend v{process.env.NEXT_PUBLIC_APP_VERSION || "0.0.0"}
             </div>
             {versionInfo && (
-                <div className="text-[10px] text-white/20 font-mono">
-                    Bot v{versionInfo.currentVersion}
-                    {versionInfo.hasUpdate && (
-                        <a href={versionInfo.downloadUrl} target="_blank" rel="noreferrer" className="block text-emerald-400 hover:text-emerald-300 mt-1 font-bold animate-pulse">
-                            Update Available: v{versionInfo.latestVersion}
-                        </a>
-                    )}
+                <div className="text-[10px] text-white/20 font-mono flex items-center gap-3">
+                    <div>
+                      Bot v{versionInfo.currentVersion}
+                      {versionInfo.hasUpdate && (
+                          <a href={versionInfo.downloadUrl} target="_blank" rel="noreferrer" className="block text-emerald-400 hover:text-emerald-300 mt-1 font-bold animate-pulse">
+                              Update Available: v{versionInfo.latestVersion}
+                          </a>
+                      )}
+                      {versionInfo.lastChecked && (
+                        <div className="text-[10px] text-white/20 font-mono mt-1">Last checked: {new Date(versionInfo.lastChecked).toLocaleString()}</div>
+                      )}
+                    </div>
+
+                    <button onClick={checkForUpdates} disabled={checking} className="ml-2 bg-white/5 px-3 py-1 rounded-md text-xs">
+                      {checking ? 'Checking...' : 'Check for updates'}
+                    </button>
                 </div>
             )}
         </div>

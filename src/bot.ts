@@ -82,6 +82,10 @@ export class Bot {
     // this.marketStream.disconnect();
   }
 
+  isBotRunning() {
+    return this.isRunning;
+  }
+
   getSettings() {
     return this.settings;
   }

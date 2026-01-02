@@ -3,8 +3,9 @@
 import { useState, useEffect } from "react";
 import { GlassCard } from "./ui/GlassCard";
 import { LiquidButton } from "./ui/LiquidButton";
-import { Activity, Power, RefreshCw, Terminal } from "lucide-react";
+import { Activity, Power, Terminal } from "lucide-react";
 import { API_BASE } from "../lib/api";
+import SideNav from "./SideNav";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -12,18 +13,35 @@ interface DashboardLayoutProps {
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [status, setStatus] = useState<any>({ status: "unknown" });
+  const [toggling, setToggling] = useState(false);
+
+  const refreshStatus = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/status`, { cache: "no-store" });
+      const data = await res.json();
+      setStatus(data);
+    } catch {
+      setStatus({ status: "offline" });
+    }
+  };
 
   useEffect(() => {
-    fetch(`${API_BASE}/api/status`)
-      .then((res) => res.json())
-      .then((data) => setStatus(data))
-      .catch(() => setStatus({ status: "offline" }));
+    refreshStatus();
+    const iv = setInterval(refreshStatus, 5000);
+    return () => clearInterval(iv);
   }, []);
 
   const toggleBot = async () => {
-    const endpoint = status.status === "running" ? "stop" : "start";
-    await fetch(`${API_BASE}/api/bot/${endpoint}`, { method: "POST" });
-    window.location.reload();
+    if (toggling) return;
+    setToggling(true);
+    try {
+      const endpoint = status.status === "running" ? "stop" : "start";
+      await fetch(`${API_BASE}/api/bot/${endpoint}`, { method: "POST" });
+      // Give the server a moment, then refresh state (stop can take up to a few seconds)
+      setTimeout(() => refreshStatus(), 500);
+    } finally {
+      setTimeout(() => setToggling(false), 800);
+    }
   };
 
   return (
@@ -70,16 +88,17 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             >
               <div className="flex items-center gap-2">
                 <Power className="w-4 h-4" />
-                {status.status === 'running' ? 'Stop Engine' : 'Initialize'}
+                {toggling ? 'Working...' : (status.status === 'running' ? 'Stop Engine' : 'Initialize')}
               </div>
             </LiquidButton>
           </div>
         </header>
 
         {/* Main Content */}
-        <main className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {children}
-        </main>
+        <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-6">
+          <SideNav status={status} />
+          <main className="min-w-0">{children}</main>
+        </div>
       </div>
     </div>
   );
