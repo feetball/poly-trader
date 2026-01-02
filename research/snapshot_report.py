@@ -57,8 +57,8 @@ def convert_timestamp(timestamp_value):
         timestamp = float(timestamp_value)
         
         # Check if timestamp is in milliseconds
-        # Use 1e12 as threshold (corresponds to ~Sep 2001 if milliseconds, ~year 31688 if seconds)
-        # All realistic timestamps after year 2001 in milliseconds will be > 1e12
+        # Use 1e12 as threshold (corresponds to Sep 9, 2001 01:46:40 UTC if milliseconds, ~year 31688 if seconds)
+        # All realistic timestamps after Sep 2001 in milliseconds will be > 1e12
         if timestamp > 1e12:
             timestamp = timestamp / 1000.0
         
