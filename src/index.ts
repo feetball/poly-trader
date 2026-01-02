@@ -3,11 +3,14 @@ import cors from "cors";
 import dotenv from "dotenv";
 import { PolymarketClient } from "./clients/polymarket";
 import { Bot } from "./bot";
+import { UpdateManager } from "./managers/UpdateManager";
 
 dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3000;
+const packageJson = require("../package.json");
+const updateManager = new UpdateManager(packageJson.version);
 
 app.use(cors());
 app.use(express.json());
@@ -63,6 +66,14 @@ app.get("/api/portfolio", (req, res) => {
 
 app.get("/api/markets", (req, res) => {
   res.json(bot.getScannedMarkets());
+});
+
+app.get("/api/version", async (req, res) => {
+  const updateInfo = await updateManager.checkForUpdates();
+  res.json({
+    currentVersion: packageJson.version,
+    ...updateInfo
+  });
 });
 
 // Start Server
