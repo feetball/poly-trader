@@ -14,6 +14,7 @@ interface DashboardLayoutProps {
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [status, setStatus] = useState<any>({ status: "unknown" });
   const [toggling, setToggling] = useState(false);
+  const [version, setVersion] = useState<string>("loading...");
 
   const refreshStatus = async () => {
     try {
@@ -25,10 +26,25 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     }
   };
 
+  const refreshVersion = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/version`, { cache: "no-store" });
+      const data = await res.json();
+      setVersion(`v${data.currentVersion}`);
+    } catch {
+      setVersion("unknown");
+    }
+  };
+
   useEffect(() => {
     refreshStatus();
+    refreshVersion();
     const iv = setInterval(refreshStatus, 5000);
-    return () => clearInterval(iv);
+    const versionIv = setInterval(refreshVersion, 60000); // check version every minute
+    return () => {
+      clearInterval(iv);
+      clearInterval(versionIv);
+    };
   }, []);
 
   const toggleBot = async () => {
@@ -78,7 +94,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           <div className="flex items-center gap-4">
             <GlassCard className="!p-2 !rounded-xl flex items-center gap-3 px-4">
               <Terminal className="w-4 h-4 text-white/40" />
-              <span className="text-xs font-mono text-white/60">v2.4.0-beta</span>
+              <span className="text-xs font-mono text-white/60">{version}</span>
             </GlassCard>
             
             <LiquidButton 
