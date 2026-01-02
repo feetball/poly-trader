@@ -28,16 +28,33 @@ export class PositionManager {
     dailyLossLimit: 100
   };
   private dailyPnL: number = 0;
+  private lastDailyPnLResetDate: string | null = null;
 
   constructor(client: PolymarketClient) {
     this.client = client;
+    // Initialize the daily PnL reset date to today so we only reset when the day actually changes.
+    this.lastDailyPnLResetDate = new Date().toISOString().slice(0, 10);
   }
 
   updateRiskLimits(limits: Partial<RiskLimits>) {
     this.riskLimits = { ...this.riskLimits, ...limits };
   }
 
+  /**
+   * Ensure that dailyPnL represents only today's PnL by resetting it
+   * when a new calendar day starts.
+   */
+  private ensureDailyPnLReset(): void {
+    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    if (this.lastDailyPnLResetDate !== today) {
+      this.dailyPnL = 0;
+      this.lastDailyPnLResetDate = today;
+    }
+  }
+
   checkRisk(sizeUSDC: number): boolean {
+    // Ensure daily PnL is scoped to the current day before applying risk checks
+    this.ensureDailyPnLReset();
     // 1. Check Position Size Limit
     if (sizeUSDC > this.riskLimits.maxPositionSize) {
       console.warn(`Risk Check Failed: Order size ${sizeUSDC} > Max ${this.riskLimits.maxPositionSize}`);
