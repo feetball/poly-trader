@@ -41,7 +41,7 @@ export class ArbitrageStrategy extends Strategy {
           const bestAskNo = obNo.asks.length > 0 ? parseFloat(obNo.asks[0].price) : 1;
           
           // Fee calculation (Polymarket takes fees on winnings, but entry is fee-free usually on CLOB maker, taker pays fee)
-          // Assuming taker fee is ~0.1% or similar. We target a sum < 0.99 to be safe.
+          // Assuming taker fee is ~0.1% or similar. We target a sum < 0.995 to maintain at least a 0.5% edge after fees.
           const totalCost = bestAskYes + bestAskNo;
           const profitMargin = 1.0 - totalCost;
 
