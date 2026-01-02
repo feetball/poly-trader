@@ -108,6 +108,31 @@ app.post("/api/bot/stop", (req, res) => {
   res.json({ message: "Bot stopped", running: bot.isBotRunning() });
 });
 
+app.get("/api/wallet", (req, res) => {
+  res.json({ balance: bot.getWalletBalance() });
+});
+
+app.post("/api/wallet/set", (req, res) => {
+  const { amount } = req.body;
+  if (typeof amount !== "number" || amount < 0) {
+    return res.status(400).json({ error: "Invalid amount" });
+  }
+  bot.setWalletBalance(amount);
+  res.json({ balance: bot.getWalletBalance() });
+});
+
+app.post("/api/positions/reset", (req, res) => {
+  bot.resetPositions();
+  res.json({ message: "Positions cleared" });
+});
+
+app.post("/api/reset-all", (req, res) => {
+  const { amount } = req.body;
+  const resetAmount = typeof amount === "number" ? amount : 10000;
+  bot.resetWalletAndPositions(resetAmount);
+  res.json({ message: "Wallet and positions reset", balance: bot.getWalletBalance() });
+});
+
 app.get("/api/logs", (req, res) => {
   const limit = Math.max(1, Math.min(1000, Number(req.query.limit || 200)));
   const since = Number(req.query.since || 0);

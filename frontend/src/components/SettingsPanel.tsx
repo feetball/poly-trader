@@ -13,6 +13,9 @@ export default function SettingsPanel() {
   const [checking, setChecking] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
+  const [disabled, setDisabled] = useState(false);
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  const [resettingWallet, setResettingWallet] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -52,6 +55,19 @@ export default function SettingsPanel() {
     fetchSettings();
     fetchVersion();
 
+    // Fetch wallet balance
+    const fetchWallet = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/wallet`);
+        const data = await res.json();
+        if (!mounted) return;
+        setWalletBalance(data.balance);
+      } catch (e) {
+        console.error("Failed to fetch wallet", e);
+      }
+    };
+    fetchWallet();
+
     // Poll for version updates every 60s
     const iv = setInterval(fetchVersion, 60 * 1000);
 
@@ -68,6 +84,25 @@ export default function SettingsPanel() {
       console.error("Update check failed", e);
     } finally {
       setChecking(false);
+    }
+  };
+
+  const resetWallet = async () => {
+    setResettingWallet(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/reset-all`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: 10000 }),
+      });
+      const data = await res.json();
+      setWalletBalance(data.balance);
+      setSaveStatus("Wallet & positions reset to defaults");
+    } catch (e) {
+      console.error("Reset failed", e);
+      setSaveStatus("Reset failed");
+    } finally {
+      setResettingWallet(false);
     }
   };
 
@@ -91,7 +126,7 @@ export default function SettingsPanel() {
     }
   };
 
-  if (loading) return <GlassCard>Loading settings...</GlassCard>;
+  if (loading || !settings) return <GlassCard>Loading settings...</GlassCard>;
 
   return (
     <GlassCard>
@@ -105,18 +140,36 @@ export default function SettingsPanel() {
           <label className="block text-xs font-medium text-white/60 mb-1.5 uppercase tracking-wider">Max Position (USDC)</label>
           <input
             type="number"
-            value={settings.maxPositionSize}
+            value={settings?.maxPositionSize || 0}
             onChange={(e) => setSettings({ ...settings, maxPositionSize: Number(e.target.value) })}
             className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-blue-500/50 transition-colors"
           />
         </div>
-        
+
+        {walletBalance !== null && (
+          <div>
+            <label className="block text-xs font-medium text-white/60 mb-1.5 uppercase tracking-wider">Wallet Balance</label>
+            <div className="flex gap-2 items-center">
+              <div className="flex-1 bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-white">
+                ${walletBalance.toFixed(2)}
+              </div>
+              <button
+                onClick={resetWallet}
+                disabled={resettingWallet}
+                className="px-4 py-2.5 bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 rounded-xl text-xs font-medium hover:bg-yellow-500/20 transition-colors disabled:opacity-50"
+              >
+                {resettingWallet ? "Resetting..." : "Reset"}
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-medium text-white/60 mb-1.5 uppercase tracking-wider">Stop Loss (%)</label>
             <input
               type="number"
-              value={settings.stopLossPercentage}
+              value={settings?.stopLossPercentage || 0}
               onChange={(e) => setSettings({ ...settings, stopLossPercentage: Number(e.target.value) })}
               className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-blue-500/50 transition-colors"
             />
@@ -125,7 +178,7 @@ export default function SettingsPanel() {
             <label className="block text-xs font-medium text-white/60 mb-1.5 uppercase tracking-wider">Take Profit (%)</label>
             <input
               type="number"
-              value={settings.takeProfitPercentage}
+              value={settings?.takeProfitPercentage || 0}
               onChange={(e) => setSettings({ ...settings, takeProfitPercentage: Number(e.target.value) })}
               className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-blue-500/50 transition-colors"
             />
@@ -140,7 +193,7 @@ export default function SettingsPanel() {
                 key={strat} 
                 className={`
                   cursor-pointer flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all duration-200
-                  ${settings.enabledStrategies.includes(strat) 
+                  ${settings?.enabledStrategies?.includes(strat) 
                     ? 'bg-blue-500/20 border-blue-500/50 text-blue-200' 
                     : 'bg-white/5 border-white/10 text-white/40 hover:bg-white/10'}
                 `}
@@ -148,7 +201,7 @@ export default function SettingsPanel() {
                 <input
                   type="checkbox"
                   className="hidden"
-                  checked={settings.enabledStrategies.includes(strat)}
+                  checked={settings?.enabledStrategies?.includes(strat) || false}
                   onChange={(e) => {
                     const newStrats = e.target.checked
                       ? [...settings.enabledStrategies, strat]
@@ -162,7 +215,7 @@ export default function SettingsPanel() {
           </div>
         </div>
 
-        <LiquidButton onClick={saveSettings} className="w-full mt-2" disabled={saving}>
+        <LiquidButton onClick={saveSettings} className="w-full mt-2" disabled={saving || disabled}>
           <div className="flex items-center justify-center gap-2">
             <Save className="w-4 h-4" />
             {saving ? "Saving..." : "Save Changes"}

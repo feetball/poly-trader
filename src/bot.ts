@@ -29,6 +29,7 @@ export class Bot {
   private positionManager: PositionManager;
   private marketStream: MarketDataStream;
   private userAnalysis: UserAnalysisService;
+  private walletBalance: number = 10000; // Default $10k
   
   private settings: BotSettings = {
     minLiquidity: 10000,
@@ -84,6 +85,27 @@ export class Bot {
 
   isBotRunning() {
     return this.isRunning;
+  }
+
+  getWalletBalance(): number {
+    return this.walletBalance;
+  }
+
+  setWalletBalance(amount: number) {
+    if (amount < 0) amount = 0;
+    this.walletBalance = amount;
+    console.log(`Wallet balance set to $${amount.toFixed(2)}`);
+  }
+
+  resetPositions() {
+    this.positionManager.clearAllPositions();
+    console.log("All positions cleared");
+  }
+
+  resetWalletAndPositions(amount: number = 10000) {
+    this.walletBalance = Math.max(0, amount);
+    this.positionManager.clearAllPositions();
+    console.log(`Wallet reset to $${this.walletBalance.toFixed(2)} and positions cleared`);
   }
 
   getSettings() {

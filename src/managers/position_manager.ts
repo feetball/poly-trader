@@ -166,6 +166,12 @@ export class PositionManager {
     return Array.from(this.positions.values()).filter(p => p.shares > 0);
   }
 
+  clearAllPositions() {
+    this.positions.clear();
+    this.dailyPnL = 0;
+    this.lastDailyPnLResetDate = new Date().toISOString().slice(0, 10);
+  }
+
   // Mock redemption for paper trading
   redeem(marketId: string, winningOutcome: "YES" | "NO") {
     for (const [key, position] of this.positions) {
