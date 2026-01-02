@@ -15,10 +15,17 @@ export class UserAnalysisService {
   private subgraphUrl = "https://api.thegraph.com/subgraphs/name/tokenunion/polymarket-matic";
 
   async getUserTrades(address: string): Promise<UserTrade[]> {
+    // Validate address format (Ethereum address: 0x followed by 40 hex characters)
+    const addressPattern = /^0x[a-fA-F0-9]{40}$/;
+    if (!addressPattern.test(address)) {
+      console.error("Invalid address format:", address);
+      return [];
+    }
+
     const query = `
-      {
+      query GetUserTrades($userAddress: String!) {
         transactions(
-          where: { user: "${address.toLowerCase()}" }
+          where: { user: $userAddress }
           orderBy: timestamp
           orderDirection: desc
           first: 50
@@ -37,8 +44,15 @@ export class UserAnalysisService {
       }
     `;
 
+    const variables = {
+      userAddress: address.toLowerCase()
+    };
+
     try {
-      const response = await axios.post(this.subgraphUrl, { query });
+      const response = await axios.post(this.subgraphUrl, { 
+        query, 
+        variables 
+      });
       const data = response.data?.data?.transactions || [];
       
       return data.map((t: any) => ({
