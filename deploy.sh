@@ -3,7 +3,7 @@
 MODE=$1
 
 if [ -z "$MODE" ]; then
-  echo "Usage: ./deploy.sh [dev]"
+  echo "Usage: ./deploy.sh [dev|update]"
   exit 1
 fi
 
@@ -33,8 +33,60 @@ if [ "$MODE" == "dev" ]; then
 
   # Keep script running to maintain background processes
   wait
+elif [ "$MODE" == "update" ]; then
+  echo "🔄 Updating repository and redeploying containers..."
+
+  if ! command -v git >/dev/null 2>&1; then
+    echo "Error: git is required for update mode."
+    exit 1
+  fi
+
+  BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+  if [ -z "$BRANCH" ]; then
+    echo "Error: Not a git repository."
+    exit 1
+  fi
+
+  # Check for uncommitted changes
+  if [ -n "$(git status --porcelain)" ]; then
+    if [ "$2" != "--force" ]; then
+      echo "⚠️  Uncommitted changes detected. Commit or stash them, or run './deploy.sh update --force' to force update."
+      exit 1
+    fi
+    echo "Forcing update by discarding local changes..."
+  fi
+
+  git fetch --all --prune
+  git reset --hard origin/$BRANCH
+  git clean -fd
+
+  echo "✅ Updated to $(git rev-parse --short HEAD) on branch $BRANCH"
+
+  # Find docker-compose command
+  if command -v docker-compose >/dev/null 2>&1; then
+    COMPOSE="docker-compose"
+  elif docker compose version >/dev/null 2>&1; then
+    COMPOSE="docker compose"
+  else
+    echo "Error: docker-compose is required to deploy containers."
+    exit 1
+  fi
+
+  if [ -f docker-compose.yml ]; then
+    echo "📦 Pulling, building, and starting containers..."
+    $COMPOSE pull --ignore-pull-failures || true
+    $COMPOSE build --pull
+    $COMPOSE up -d
+    echo "✅ Containers deployed"
+  else
+    echo "⚠️  No docker-compose.yml found; attempting a local Docker build..."
+    docker build -t poly-trader .
+    docker rm -f poly-trader || true
+    docker run -d --restart unless-stopped --name poly-trader poly-trader
+    echo "✅ Container deployed"
+  fi
 else
   echo "Unknown mode: $MODE"
-  echo "Available modes: dev"
+  echo "Available modes: dev, update"
   exit 1
 fi
