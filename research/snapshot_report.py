@@ -54,7 +54,18 @@ def analyze_trades(trades):
         # Simple heuristic: If they bought low and it's a recent trade, we don't know outcome yet
         # But we can see their average entry price
         
-        print(f"[{datetime.fromtimestamp(int(trade['timestamp']))}] {trade['type']} {amount:.2f} shares @ {price:.2f} - {trade['market']['question'][:50]}...")
+        # Handle timestamp conversion with error handling
+        try:
+            timestamp = int(trade['timestamp'])
+            # Check if timestamp is in milliseconds (convert to seconds if so)
+            if timestamp > 10000000000:  # Timestamps after year 2286 in seconds, likely milliseconds
+                timestamp = timestamp // 1000
+            trade_time = datetime.fromtimestamp(timestamp)
+        except (ValueError, TypeError, OSError) as e:
+            # If conversion fails, use a placeholder
+            trade_time = "Invalid timestamp"
+        
+        print(f"[{trade_time}] {trade['type']} {amount:.2f} shares @ {price:.2f} - {trade['market']['question'][:50]}...")
 
     print(f"\nTotal Volume Traded: ${total_volume:.2f}")
 
