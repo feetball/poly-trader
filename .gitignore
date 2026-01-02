@@ -38,3 +38,10 @@ __pycache__/
 *.pem
 *.key
 *.env.secret
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python

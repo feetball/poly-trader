@@ -6,6 +6,9 @@ from datetime import datetime
 TARGET_USER = os.getenv("POLYMARKET_TARGET_USER", "0x790A4485e5198763C0a34272698ed0cd9506949B") # Example whale
 SUBGRAPH_URL = "https://api.thegraph.com/subgraphs/name/tokenunion/polymarket-matic"
 
+# Timestamp threshold to detect milliseconds (timestamps after year 2286 in seconds)
+MILLISECOND_THRESHOLD = 10000000000
+
 def fetch_user_trades(user_address):
     query = """
     {
@@ -80,9 +83,18 @@ def analyze_trades(trades):
         # Simple heuristic: If they bought low and it's a recent trade, we don't know outcome yet
         # But we can see their average entry price
         
-        timestamp_dt = convert_timestamp(trade['timestamp'])
-        timestamp_str = timestamp_dt.strftime('%Y-%m-%d %H:%M:%S') if timestamp_dt else 'Unknown'
-        print(f"[{timestamp_str}] {trade['type']} {amount:.2f} shares @ {price:.2f} - {trade['market']['question'][:50]}...")
+        # Handle timestamp conversion with error handling
+        try:
+            timestamp = int(trade['timestamp'])
+            # Check if timestamp is in milliseconds (convert to seconds if so)
+            if timestamp > MILLISECOND_THRESHOLD:
+                timestamp = timestamp // 1000
+            trade_time = datetime.fromtimestamp(timestamp)
+        except (ValueError, TypeError, OSError):
+            # If conversion fails, use a placeholder
+            trade_time = "Invalid timestamp"
+        
+        print(f"[{trade_time}] {trade['type']} {amount:.2f} shares @ {price:.2f} - {trade['market']['question'][:50]}...")
 
     print(f"\nTotal Volume Traded: ${total_volume:.2f}")
 
