@@ -4,6 +4,8 @@ export class ArbitrageStrategy extends Strategy {
   id = "arbitrage";
   name = "Complete-Set Arbitrage";
   description = "Exploits mispricing where YES + NO < 1.00 (Risk-Free Profit)";
+  
+  private static readonly MIN_TRADE_SIZE_USDC = 5;
 
   async analyze(context: StrategyContext): Promise<MarketOpportunity[]> {
     const opportunities: MarketOpportunity[] = [];
@@ -51,7 +53,7 @@ export class ArbitrageStrategy extends Strategy {
              const sizeNo = obNo.asks.length > 0 ? parseFloat(obNo.asks[0].size) : 0;
              const maxExecSize = Math.min(sizeYes, sizeNo);
 
-             if (maxExecSize > 5) { // Minimum $5 size
+             if (maxExecSize > ArbitrageStrategy.MIN_TRADE_SIZE_USDC) {
                 opportunities.push({
                   marketId: market.id,
                   question: market.question,
