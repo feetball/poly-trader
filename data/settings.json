@@ -3,7 +3,7 @@
   "maxPositionSize": 500,
   "stopLossPercentage": 1,
   "takeProfitPercentage": 3,
-  "scanIntervalMs": 300000,
+  "scanIntervalMs": 200,
   "updownHoldMs": 3600000,
   "enabledStrategies": []
 }

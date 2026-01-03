@@ -34,7 +34,8 @@ describe("Bot websocket integration", () => {
 
     // Ensure mapping exists
     const mapping = (bot as any).assetToMarkets.get("asset1");
-    expect(mapping.has("m1")).toBe(true);
+    expect(mapping).toBeDefined();
+    expect((mapping as any).has("m1")).toBe(true);
 
     // Emit a price_update event
     const mds: MarketDataStream = (bot as any).marketStream;

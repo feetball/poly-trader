@@ -194,28 +194,31 @@ export function createApp(opts: {
     res.setHeader("Connection", "keep-alive");
     // Send initial snapshot
     res.flushHeaders?.();
-    // Prevent unhandled socket errors when clients abort
-    res.on("error", () => {});
+    // Prevent unhandled socket errors when clients abort, but log them for debugging
+    res.on("error", (err) => {
+      console.error("SSE /api/positions/stream connection error:", err);
+    });
 
     const send = (payload: any) => {
       try {
         res.write(`data: ${JSON.stringify(payload)}\n\n`);
       } catch (e) {
-        // ignore write errors
+        // Client disconnected or network error - log for debugging but don't crash
+        console.error("SSE write error (client likely disconnected):", e);
       }
     };
 
     send(bot.getPortfolio());
 
     const handler = (payload: any) => send(payload);
-    if (bot && (bot as any).events && typeof (bot as any).events.on === "function") {
-      (bot as any).events.on("positions", handler);
+    if (bot && bot.events && typeof bot.events.on === "function") {
+      bot.events.on("positions", handler);
     }
 
     req.on("close", () => {
       try {
-        if (bot && (bot as any).events && typeof (bot as any).events.off === "function") {
-          (bot as any).events.off("positions", handler);
+        if (bot && bot.events && typeof bot.events.off === "function") {
+          bot.events.off("positions", handler);
         }
       } catch (e) {}
     });
