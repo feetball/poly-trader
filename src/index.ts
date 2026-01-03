@@ -201,7 +201,9 @@ export function createApp(opts: {
       try {
         res.write(`data: ${JSON.stringify(payload)}\n\n`);
       } catch (e) {
-        // ignore write errors
+        // Write errors occur when client disconnects (e.g., ERR_STREAM_WRITE_AFTER_END)
+        // This is expected behavior for SSE streams and can be safely ignored
+        console.error(`[SSE] Failed to send data to client: ${e instanceof Error ? e.message : String(e)}`);
       }
     };
 
