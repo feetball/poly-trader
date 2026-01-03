@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BarChart3, Settings, Briefcase, FileText, Menu, X } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface SideNavProps {
   status: { status: string };
@@ -21,6 +21,18 @@ export default function SideNav({ status }: SideNavProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const closeMobileMenu = () => setIsMobileMenuOpen(false);
+
+  // Handle Escape key to close mobile menu
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isMobileMenuOpen) {
+        closeMobileMenu();
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [isMobileMenuOpen]);
 
   const renderNavContent = () => (
     <>
@@ -72,6 +84,7 @@ export default function SideNav({ status }: SideNavProps) {
         onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
         className="lg:hidden fixed top-6 left-6 z-50 p-3 rounded-xl bg-white/10 border border-white/20 backdrop-blur-md hover:bg-white/20 transition-all duration-200"
         aria-label="Toggle menu"
+        aria-expanded={isMobileMenuOpen}
       >
         {isMobileMenuOpen ? (
           <X className="w-5 h-5 text-white" />
@@ -85,6 +98,7 @@ export default function SideNav({ status }: SideNavProps) {
         <div
           className="lg:hidden fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
           onClick={closeMobileMenu}
+          role="presentation"
         />
       )}
 
@@ -95,6 +109,9 @@ export default function SideNav({ status }: SideNavProps) {
           transform transition-transform duration-300 ease-in-out
           ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"}
         `}
+        aria-hidden={!isMobileMenuOpen}
+        role="dialog"
+        aria-label="Mobile navigation menu"
       >
         <div className="flex flex-col gap-2 p-6 pt-24">
           {renderNavContent()}
