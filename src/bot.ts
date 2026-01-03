@@ -262,143 +262,148 @@ export class Bot {
   private async runLoop() {
     while (this.isRunning) {
       try {
-        console.log("Scanning markets...");
-
-        // Keep risk limits in sync with settings.
-        this.positionManager.updateRiskLimits({
-          maxPositionSize: Number(this.settings.maxPositionSize) || 50,
-          // conservative default exposure cap: 10 positions worth of max size
-          maxPortfolioExposure: Math.max(50, (Number(this.settings.maxPositionSize) || 50) * 10),
-          stopLossPercentage: Number(this.settings.stopLossPercentage) || 10,
-          takeProfitPercentage: Number(this.settings.takeProfitPercentage) || 20,
-        });
-        
-        // 1. Fetch Real Market Data via Gamma API
-        const events = await this.client.getGammaMarkets({ 
-          limit: 10, 
-          active: true, 
-          closed: false,
-          order: "volume24hr",
-          ascending: false
-        });
-        
-        // Map Gamma data to our internal structure
-        const marketYesPrices: Map<string, number> = new Map();
-        if (Array.isArray(events)) {
-            const markets: ScannedMarket[] = [];
-            const assetIdsToSubscribe: string[] = [];
-            
-            for (const event of events) {
-                const eventMarkets = event.markets || [];
-                for (const m of eventMarkets) {
-                    let prob = 0.5;
-                    try {
-                        if (m.outcomePrices) {
-                            const prices = JSON.parse(m.outcomePrices);
-                            prob = parseFloat(prices[0]);
-                        }
-                    } catch (e) {}
-
-                    if (Number.isFinite(prob)) {
-                      marketYesPrices.set(m.id, prob);
-                    }
-
-                    markets.push({
-                        id: m.id,
-                        question: m.question,
-                        volume: Number(m.volume) || 0,
-                        probability: prob,
-                        tags: [event.slug?.split('-')[0] || "General"]
-                    });
-
-                    // Collect asset IDs for WS subscription
-                    if (m.clobTokenIds) {
-                      try {
-                        const tokens = JSON.parse(m.clobTokenIds);
-                        assetIdsToSubscribe.push(...tokens);
-                      } catch(e) {}
-                    }
-                }
-            }
-            this.scannedMarkets = markets.slice(0, 20);
-            
-            // Subscribe to top markets for real-time updates
-            if (assetIdsToSubscribe.length > 0) {
-              this.marketStream.subscribe(assetIdsToSubscribe.slice(0, 50));
-            }
-        }
-
-        // Update PnL + enforce stop-loss/take-profit based on latest scanned prices.
-        if (marketYesPrices.size > 0) {
-          this.positionManager.updatePrices(marketYesPrices);
-        }
-
-        // Auto-close expired positions (e.g., 15-minute holds).
-        this.positionManager.closeExpiredPositions(Date.now());
-
-        // 2. Run Strategies
-        const context: StrategyContext = {
-            client: this.client,
-            settings: this.settings
-        };
-
-        for (const strategy of this.strategies) {
-            if (this.settings.enabledStrategies.includes(strategy.id)) {
-                // console.log(`Running strategy: ${strategy.name}`);
-                const opportunities = await strategy.analyze(context);
-
-                // Stamp strategy id for downstream consumers.
-                for (const opp of opportunities) {
-                  if (!opp.strategy) opp.strategy = strategy.id;
-                }
-                
-                if (opportunities.length > 0) {
-                    console.log(`Found ${opportunities.length} opportunities via ${strategy.name}`);
-
-                    // UpDown15: enter on signal, hold for ~15 minutes, then exit.
-                    if (strategy.id === "updown_15") {
-                      const now = Date.now();
-                      const holdMs = Math.max(60_000, Number(this.settings.updownHoldMs) || 15 * 60 * 1000);
-                      for (const opp of opportunities) {
-                        if (opp.outcome !== "YES" && opp.outcome !== "NO") continue;
-                        if (!opp.price || opp.price <= 0 || opp.price >= 1) continue;
-                        if (this.positionManager.hasOpenPosition(opp.marketId, opp.outcome)) continue;
-
-                        const desiredUsdc = Math.min(
-                          Number(this.settings.maxPositionSize) || 50,
-                          Number(opp.size) || Number(this.settings.maxPositionSize) || 50
-                        );
-                        const shares = Math.max(1, desiredUsdc / opp.price);
-
-                        const ok = this.positionManager.addPosition(
-                          opp.marketId,
-                          opp.question || "Unknown Market",
-                          opp.outcome,
-                          shares,
-                          opp.price
-                        );
-                        if (ok) {
-                          this.positionManager.setPositionMeta(opp.marketId, opp.outcome, {
-                            openedAt: now,
-                            closeAt: now + holdMs,
-                            strategy: "updown_15",
-                          });
-                          console.log(
-                            `Opened updown_15 position: ${opp.marketId} ${opp.outcome} @ ${opp.price.toFixed(3)} for ~$${desiredUsdc.toFixed(2)} (hold ${(holdMs / 60000).toFixed(0)}m)`
-                          );
-                        }
-                      }
-                    }
-                }
-            }
-        }
-
-        const sleepMs = Math.max(1000, Number(this.settings.scanIntervalMs) || 5000);
-        await new Promise((resolve) => setTimeout(resolve, sleepMs));
+        await this.runOnce();
       } catch (error) {
         console.error("Error in bot loop:", error);
-        const sleepMs = Math.max(1000, Number(this.settings.scanIntervalMs) || 5000);
-        await new Promise((resolve) => setTimeout(resolve, sleepMs));
+      }
+
+      const sleepMs = Math.max(1000, Number(this.settings.scanIntervalMs) || 5000);
+      await new Promise((resolve) => setTimeout(resolve, sleepMs));
+    }
+  }
+
+  // Executes a single scan/act iteration. Extracted for testability.
+  private async runOnce() {
+    console.log("Scanning markets...");
+
+    // Keep risk limits in sync with settings.
+    this.positionManager.updateRiskLimits({
+      maxPositionSize: Number(this.settings.maxPositionSize) || 50,
+      // conservative default exposure cap: 10 positions worth of max size
+      maxPortfolioExposure: Math.max(50, (Number(this.settings.maxPositionSize) || 50) * 10),
+      stopLossPercentage: Number(this.settings.stopLossPercentage) || 10,
+      takeProfitPercentage: Number(this.settings.takeProfitPercentage) || 20,
+    });
+
+    // 1. Fetch Real Market Data via Gamma API
+    const events = await this.client.getGammaMarkets({
+      limit: 10,
+      active: true,
+      closed: false,
+      order: "volume24hr",
+      ascending: false,
+    });
+
+    // Map Gamma data to our internal structure
+    const marketYesPrices: Map<string, number> = new Map();
+    if (Array.isArray(events)) {
+      const markets: ScannedMarket[] = [];
+      const assetIdsToSubscribe: string[] = [];
+
+      for (const event of events) {
+        const eventMarkets = event.markets || [];
+        for (const m of eventMarkets) {
+          let prob = 0.5;
+          try {
+            if (m.outcomePrices) {
+              const prices = JSON.parse(m.outcomePrices);
+              prob = parseFloat(prices[0]);
+            }
+          } catch (e) {}
+
+          if (Number.isFinite(prob)) {
+            marketYesPrices.set(m.id, prob);
+          }
+
+          markets.push({
+            id: m.id,
+            question: m.question,
+            volume: Number(m.volume) || 0,
+            probability: prob,
+            tags: [event.slug?.split("-")[0] || "General"],
+          });
+
+          // Collect asset IDs for WS subscription
+          if (m.clobTokenIds) {
+            try {
+              const tokens = JSON.parse(m.clobTokenIds);
+              assetIdsToSubscribe.push(...tokens);
+            } catch (e) {}
+          }
+        }
+      }
+      this.scannedMarkets = markets.slice(0, 20);
+
+      // Subscribe to top markets for real-time updates
+      if (assetIdsToSubscribe.length > 0) {
+        this.marketStream.subscribe(assetIdsToSubscribe.slice(0, 50));
+      }
+    }
+
+    // Update PnL + enforce stop-loss/take-profit based on latest scanned prices.
+    if (marketYesPrices.size > 0) {
+      this.positionManager.updatePrices(marketYesPrices);
+    }
+
+    // Auto-close expired positions (e.g., 15-minute holds).
+    this.positionManager.closeExpiredPositions(Date.now());
+
+    // 2. Run Strategies
+    const context: StrategyContext = {
+      client: this.client,
+      settings: this.settings,
+    };
+
+    for (const strategy of this.strategies) {
+      if (this.settings.enabledStrategies.includes(strategy.id)) {
+        const opportunities = await strategy.analyze(context);
+
+        // Stamp strategy id for downstream consumers.
+        for (const opp of opportunities) {
+          if (!opp.strategy) opp.strategy = strategy.id;
+        }
+
+        if (opportunities.length > 0) {
+          console.log(`Found ${opportunities.length} opportunities via ${strategy.name}`);
+
+          // UpDown15: enter on signal, hold for ~15 minutes, then exit.
+          if (strategy.id === "updown_15") {
+            const now = Date.now();
+            const holdMs = Math.max(
+              60_000,
+              Number(this.settings.updownHoldMs) || 15 * 60 * 1000
+            );
+            for (const opp of opportunities) {
+              if (opp.outcome !== "YES" && opp.outcome !== "NO") continue;
+              if (!opp.price || opp.price <= 0 || opp.price >= 1) continue;
+              if (this.positionManager.hasOpenPosition(opp.marketId, opp.outcome)) continue;
+
+              const desiredUsdc = Math.min(
+                Number(this.settings.maxPositionSize) || 50,
+                Number(opp.size) || Number(this.settings.maxPositionSize) || 50
+              );
+              const shares = Math.max(1, desiredUsdc / opp.price);
+
+              const ok = this.positionManager.addPosition(
+                opp.marketId,
+                opp.question || "Unknown Market",
+                opp.outcome,
+                shares,
+                opp.price
+              );
+              if (ok) {
+                this.positionManager.setPositionMeta(opp.marketId, opp.outcome, {
+                  openedAt: now,
+                  closeAt: now + holdMs,
+                  strategy: "updown_15",
+                });
+                console.log(
+                  `Opened updown_15 position: ${opp.marketId} ${opp.outcome} @ ${opp.price.toFixed(3)} for ~$${desiredUsdc.toFixed(2)} (hold ${(holdMs / 60000).toFixed(0)}m)`
+                );
+              }
+            }
+          }
+        }
       }
     }
   }
