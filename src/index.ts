@@ -203,7 +203,7 @@ export function createApp(opts: {
       } catch (e) {
         // Write errors occur when client disconnects (e.g., ERR_STREAM_WRITE_AFTER_END)
         // This is expected behavior for SSE streams and can be safely ignored
-        console.error(`[SSE] Failed to send data to client: ${e instanceof Error ? e.message : String(e)}`);
+        console.warn(`[SSE] Failed to send data to client: ${e instanceof Error ? e.message : String(e)}`);
       }
     };
 
