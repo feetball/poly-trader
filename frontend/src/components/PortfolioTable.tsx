@@ -31,13 +31,20 @@ export default function PortfolioTable() {
     };
 
     fetchPortfolio();
-    const interval = setInterval(fetchPortfolio, 5000);
+    let interval: NodeJS.Timeout | null = setInterval(fetchPortfolio, 5000);
 
     // SSE: subscribe to live positions updates if supported
     let es: EventSource | null = null;
     try {
       if (typeof window !== "undefined" && typeof window.EventSource !== "undefined") {
         es = new window.EventSource(`${API_BASE}/api/positions/stream`);
+        es.onopen = () => {
+          // SSE connection established, clear polling interval to avoid redundant API calls
+          if (interval !== null) {
+            clearInterval(interval);
+            interval = null;
+          }
+        };
         es.onmessage = (ev: MessageEvent) => {
           try {
             const data = JSON.parse(ev.data);
@@ -56,6 +63,10 @@ export default function PortfolioTable() {
             console.debug("Error while closing EventSource in PortfolioTable.onerror handler:", e);
           }
           es = null;
+          // Restart polling if SSE fails
+          if (interval === null) {
+            interval = setInterval(fetchPortfolio, 5000);
+          }
         };
       }
     } catch (e) {
@@ -64,7 +75,9 @@ export default function PortfolioTable() {
     }
 
     return () => {
-      clearInterval(interval);
+      if (interval !== null) {
+        clearInterval(interval);
+      }
       try {
         es?.close();
       } catch (e) {

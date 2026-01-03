@@ -117,8 +117,13 @@ describe("PortfolioTable", () => {
     class MockEventSource {
       public onmessage: ((ev: any) => void) | null = null;
       public onerror: ((e: any) => void) | null = null;
+      public onopen: (() => void) | null = null;
       constructor(public url: string) {
         (MockEventSource as any).last = this;
+        // Simulate connection opening asynchronously
+        Promise.resolve().then(() => {
+          if (this.onopen) this.onopen();
+        });
       }
       close() { }
       // helper to dispatch messages
@@ -131,6 +136,9 @@ describe("PortfolioTable", () => {
     vi.stubGlobal("EventSource", MockEventSource);
 
     render(<PortfolioTable />);
+
+    // Wait for the component to mount and set up handlers
+    await screen.findByText("No active positions found");
 
     // get the created instance and dispatch an update
     const inst = (MockEventSource as any).last as MockEventSource;
@@ -149,6 +157,105 @@ describe("PortfolioTable", () => {
     expect(screen.getByText("WIN")).toBeInTheDocument();
 
     // cleanup
+    // @ts-ignore
+    (global as any).EventSource = undefined;
+  });
+
+  it("stops polling when SSE connects successfully", async () => {
+    vi.useFakeTimers();
+    
+    const fetchMock = vi.fn().mockResolvedValue(responseJson({ positions: [], summary: null }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    // Mock EventSource
+    class MockEventSource {
+      public onmessage: ((ev: any) => void) | null = null;
+      public onerror: ((e: any) => void) | null = null;
+      public onopen: (() => void) | null = null;
+      constructor(public url: string) {
+        (MockEventSource as any).last = this;
+        // Simulate connection opening after a short delay
+        setTimeout(() => {
+          if (this.onopen) this.onopen();
+        }, 0);
+      }
+      close() { }
+    }
+
+    // @ts-ignore
+    vi.stubGlobal("EventSource", MockEventSource);
+
+    render(<PortfolioTable />);
+    
+    // Initial fetch should happen
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    
+    // Wait for SSE to connect
+    await vi.runAllTimersAsync();
+    
+    // Clear the mock call count
+    fetchMock.mockClear();
+    
+    // Advance time by 15 seconds (3 intervals)
+    await vi.advanceTimersByTimeAsync(15000);
+    
+    // Polling should be stopped, so no more fetch calls
+    expect(fetchMock).toHaveBeenCalledTimes(0);
+
+    vi.useRealTimers();
+    // @ts-ignore
+    (global as any).EventSource = undefined;
+  });
+
+  it("restarts polling when SSE disconnects", async () => {
+    vi.useFakeTimers();
+    
+    const fetchMock = vi.fn().mockResolvedValue(responseJson({ positions: [], summary: null }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    // Mock EventSource
+    class MockEventSource {
+      public onmessage: ((ev: any) => void) | null = null;
+      public onerror: ((e: any) => void) | null = null;
+      public onopen: (() => void) | null = null;
+      constructor(public url: string) {
+        (MockEventSource as any).last = this;
+        // Simulate connection opening
+        setTimeout(() => {
+          if (this.onopen) this.onopen();
+        }, 0);
+      }
+      close() { }
+      // helper to trigger error
+      triggerError() {
+        if (this.onerror) this.onerror(new Event("error"));
+      }
+    }
+
+    // @ts-ignore
+    vi.stubGlobal("EventSource", MockEventSource);
+
+    render(<PortfolioTable />);
+    
+    // Initial fetch should happen
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    
+    // Wait for SSE to connect
+    await vi.runAllTimersAsync();
+    
+    // Get the instance and trigger an error
+    const inst = (MockEventSource as any).last as MockEventSource;
+    fetchMock.mockClear();
+    
+    inst.triggerError();
+    
+    // Advance time by 5 seconds (1 interval)
+    await vi.advanceTimersByTimeAsync(5000);
+    
+    // Polling should have restarted, so we should see a fetch call
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    vi.useRealTimers();
     // @ts-ignore
     (global as any).EventSource = undefined;
   });
