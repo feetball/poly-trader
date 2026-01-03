@@ -71,6 +71,11 @@ export class UpdateManager extends EventEmitter {
         return this.latestInfo;
     }
 
+    // utility for tests and health checks
+    public ping(): string {
+        return "pong";
+    }
+
     private compareVersions(v1: string, v2: string): number {
         const parts1 = v1.split('.').map(Number);
         const parts2 = v2.split('.').map(Number);

@@ -42,4 +42,57 @@ describe("UpdateManager polling + version comparison", () => {
 
     vi.useRealTimers();
   });
+
+  it("startPolling tolerates failures and recovers on next interval", async () => {
+    vi.useFakeTimers();
+
+    const axios = await import("axios");
+    const getSpy = vi.spyOn((axios as any).default, "get")
+      .mockRejectedValueOnce(new Error("boom"))
+      .mockResolvedValue({ data: { tag_name: "v1.2.3", html_url: "u" } });
+
+    const um = new UpdateManager("1.0.0");
+    const handler = vi.fn();
+    um.on("update", handler);
+
+    um.startPolling(1000);
+
+    // immediate call failed
+    expect(getSpy).toHaveBeenCalledTimes(1);
+
+    // advance to next interval and allow promises to settle
+    vi.advanceTimersByTime(1000);
+    await Promise.resolve();
+
+    expect(getSpy).toHaveBeenCalledTimes(2);
+    expect(handler).toHaveBeenCalled();
+    expect(um.getLatestInfo().latestVersion).toBe("1.2.3");
+
+    um.stopPolling();
+    getSpy.mockRestore();
+    vi.useRealTimers();
+  });
+
+  it("startPolling swallows errors on immediate and interval checks", async () => {
+    vi.useFakeTimers();
+
+    const axios = await import("axios");
+    const getSpy = vi.spyOn((axios as any).default, "get").mockRejectedValue(new Error("boom"));
+
+    const um = new UpdateManager("1.0.0");
+
+    um.startPolling(1000);
+
+    // immediate call
+    expect(getSpy).toHaveBeenCalledTimes(1);
+
+    // advance a couple intervals
+    vi.advanceTimersByTime(2500);
+
+    expect(getSpy.mock.calls.length).toBeGreaterThanOrEqual(3);
+
+    um.stopPolling();
+    getSpy.mockRestore();
+    vi.useRealTimers();
+  });
 });

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { Bot } from "../bot";
 
 const fakeClient: any = {
@@ -90,5 +90,61 @@ describe("Bot branches and sanitizeSettings", () => {
 
     // Nothing thrown – success; but also ensure no position added for invalid ones
     // (we can check that addPosition was called at most 0 times for invalids)
+  });
+
+  it("loadSettingsFromDisk handles invalid JSON gracefully", async () => {
+    // Create a temp file with invalid JSON and point SETTINGS_PATH to it before constructing the bot
+    const tmpDir = require("node:os").tmpdir();
+    const tmpFile = require("node:path").join(tmpDir, `bad-settings-${Date.now()}.json`);
+    const fs = require("node:fs");
+    fs.writeFileSync(tmpFile, "{ not valid json", "utf8");
+
+    process.env.SETTINGS_PATH = tmpFile;
+
+    // Capture console.warn
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    // Construct a fresh bot which will attempt to load and hit the parse error
+    const { Bot: BotClass } = await import("../bot");
+    const tmpBot = new BotClass(fakeClient);
+
+    expect(warnSpy).toHaveBeenCalled();
+
+    // cleanup
+    warnSpy.mockRestore();
+    try { fs.unlinkSync(tmpFile); } catch (e) {}
+    delete process.env.SETTINGS_PATH;
+  });
+
+  it("saveSettingsToDisk warns when write fails", async () => {
+    const fs = require("node:fs");
+
+    // make writeFileSync throw
+    const writeSpy = vi.spyOn(fs, "writeFileSync").mockImplementation(() => { throw new Error("boom"); });
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    // update settings to trigger save
+    (bot as any).updateSettings({ maxPositionSize: 123 });
+
+    expect(warnSpy).toHaveBeenCalled();
+
+    writeSpy.mockRestore();
+    warnSpy.mockRestore();
+  });
+
+  it("runOnce skips updatePrices when there are no parsed YES prices", async () => {
+    // client returns events with no outcomePrices (or invalid ones), leading to marketYesPrices.size === 0
+    fakeClient.getGammaMarkets = async () => [
+      { slug: "s1", markets: [{ id: "mA", question: "QA", volume: 10, outcomePrices: '["not-number"]' } ] }
+    ];
+
+    const pm = (bot as any).positionManager;
+    const updateSpy = vi.spyOn(pm, "updatePrices");
+
+    await (bot as any).runOnce();
+
+    expect(updateSpy).not.toHaveBeenCalled();
+
+    updateSpy.mockRestore();
   });
 });

@@ -1,5 +1,5 @@
 import request from "supertest";
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { createApp } from "../index";
 
 // Mocks
@@ -103,5 +103,68 @@ describe("index routes - error and edge branches", () => {
 
     const res2 = await request(app).post("/api/wallet/set").send({ amount: "nope" });
     expect(res2.status).toBe(400);
+  });
+
+  it("resets positions and uses default reset amount when none provided", async () => {
+    const bot = {
+      isBotRunning: () => false,
+      start: () => {},
+      stop: () => {},
+      getWalletBalance: () => 0,
+      setWalletBalance: () => {},
+      resetPositions: vi.fn(),
+      resetWalletAndPositions: vi.fn(),
+      getSettings: () => ({ scanIntervalMs: 5000 }),
+      updateSettings: (s: any) => s,
+      getPortfolio: () => [],
+      getScannedMarkets: () => [],
+    };
+
+    const app2 = createApp({
+      bot: bot as any,
+      client: fakeClient as any,
+      updateManager: fakeUpdateManager as any,
+      packageVersion: "1.0.0",
+      paperTrading: false,
+      captureLogs: false,
+    });
+
+    await request(app2).post("/api/positions/reset");
+    expect((bot.resetPositions as any)).toHaveBeenCalled();
+
+    await request(app2).post("/api/reset-all").send({});
+    expect((bot.resetWalletAndPositions as any)).toHaveBeenCalledWith(10000);
+  });
+
+  it("log buffer respects LOG_BUFFER_SIZE and honors 'since' and 'limit' params", async () => {
+    process.env.LOG_BUFFER_SIZE = "2";
+    const app3 = createApp({
+      bot: fakeBot as any,
+      client: fakeClient as any,
+      updateManager: fakeUpdateManager as any,
+      packageVersion: "1.0.0",
+      paperTrading: false,
+      captureLogs: true,
+    });
+
+    // emit 5 logs
+    console.log("l1");
+    console.log("l2");
+    console.log("l3");
+    console.log("l4");
+    console.log("l5");
+
+    const res = await request(app3).get("/api/logs?limit=1000");
+    expect(res.status).toBe(200);
+    // trimmed to LOG_BUFFER_SIZE=2
+    expect(res.body.entries.length).toBe(2);
+
+    // test 'since' filters
+    const all = await request(app3).get("/api/logs");
+    const lastTs = all.body.entries[all.body.entries.length -1].ts;
+    const resSince = await request(app3).get(`/api/logs?since=${lastTs + 1}`);
+    expect(resSince.body.entries.length).toBe(0);
+
+    delete process.env.LOG_BUFFER_SIZE;
   });
 });
