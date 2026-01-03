@@ -10,6 +10,15 @@ dotenv.config();
 type LogLevel = "log" | "info" | "warn" | "error";
 type LogEntry = { ts: number; level: LogLevel; message: string };
 
+// Extend Express types to include custom app.locals properties
+declare global {
+  namespace Express {
+    interface Locals {
+      restoreConsole: () => void;
+    }
+  }
+}
+
 export function createApp(opts: {
   bot: Bot;
   client: Pick<PolymarketClient, "getAddress" | "getApiCallsPerMinute">;
@@ -67,7 +76,7 @@ export function createApp(opts: {
   }
 
   // Allow tests/consumers to restore the original console methods.
-  (app.locals as any).restoreConsole = () => {
+  app.locals.restoreConsole = () => {
     console.log = originalConsole.log;
     console.info = originalConsole.info;
     console.warn = originalConsole.warn;
@@ -176,6 +185,42 @@ export function createApp(opts: {
 
   app.get("/api/portfolio", (req, res) => {
     res.json(bot.getPortfolio());
+  });
+
+  // Server-Sent Events: stream live positions (sends initial snapshot followed by updates)
+  app.get("/api/positions/stream", (req, res) => {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    // Send initial snapshot
+    res.flushHeaders?.();
+    // Prevent unhandled socket errors when clients abort, but log them for debugging
+    res.on("error", (err) => {
+      console.error("SSE /api/positions/stream connection error:", err);
+    });
+
+    const send = (payload: any) => {
+      try {
+        res.write(`data: ${JSON.stringify(payload)}\n\n`);
+      } catch (e) {
+        // ignore write errors
+      }
+    };
+
+    send(bot.getPortfolio());
+
+    const handler = (payload: any) => send(payload);
+    if (bot && (bot as any).events && typeof (bot as any).events.on === "function") {
+      (bot as any).events.on("positions", handler);
+    }
+
+    req.on("close", () => {
+      try {
+        if (bot && (bot as any).events && typeof (bot as any).events.off === "function") {
+          (bot as any).events.off("positions", handler);
+        }
+      } catch (e) {}
+    });
   });
 
   app.get("/api/markets", (req, res) => {

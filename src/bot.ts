@@ -1,4 +1,5 @@
 import { PolymarketClient } from "./clients/polymarket";
+import { EventEmitter } from "events";
 import { Strategy, StrategyContext } from "./strategies/base";
 import { ArbitrageStrategy } from "./strategies/arbitrage";
 import { VolumeSpikeStrategy } from "./strategies/volume";
@@ -29,6 +30,7 @@ export interface ScannedMarket {
 
 export class Bot {
   private isRunning: boolean = false;
+  public events: EventEmitter = new EventEmitter();
   private client: PolymarketClient;
   private positionManager: PositionManager;
   private marketStream: MarketDataStream;
@@ -48,6 +50,7 @@ export class Bot {
 
   private strategies: Strategy[] = [];
   private scannedMarkets: ScannedMarket[] = [];
+  private assetToMarkets: Map<string, Set<string>> = new Map();
   // private positions: Position[] = []; // Removed in favor of PositionManager
 
   constructor(client: PolymarketClient) {
@@ -136,11 +139,29 @@ export class Bot {
   }
 
   private setupMarketStream() {
-    this.marketStream.on('price_update', (event) => {
-      // Handle real-time price updates
-      // console.log('Price update:', event);
-      // Update position manager with new prices
-      // this.positionManager.updatePrices(...)
+    this.marketStream.on('price_update', (event: any) => {
+      try {
+        // event: { event_type: 'price_change', asset_id: '...', price: '0.123' }
+        const assetId = event.asset_id || event.assetId || event.asset;
+        const priceRaw = event.price || event.p || event.bid || event.ask;
+        const price = Number(priceRaw);
+        if (!assetId || !Number.isFinite(price)) return;
+
+        const markets = this.assetToMarkets.get(assetId);
+        if (!markets || markets.size === 0) return;
+
+        const marketPrices: Map<string, number> = new Map();
+        for (const mId of markets) {
+          // Treat the incoming price as the YES probability for the market
+          marketPrices.set(mId, price);
+        }
+
+        this.positionManager.updatePrices(marketPrices);
+        // Notify listeners about live positions updates
+        this.emitPositions();
+      } catch (e) {
+        console.error('Failed to process price_update event:', e);
+      }
     });
   }
 
@@ -175,12 +196,14 @@ export class Bot {
   resetPositions() {
     this.positionManager.clearAllPositions();
     console.log("All positions cleared");
+    this.emitPositions();
   }
 
   resetWalletAndPositions(amount: number = 10000) {
     this.walletBalance = Math.max(0, amount);
     this.positionManager.clearAllPositions();
     console.log(`Wallet reset to $${this.walletBalance.toFixed(2)} and positions cleared`);
+    this.emitPositions();
   }
 
   getSettings() {
@@ -330,6 +353,15 @@ export class Bot {
             try {
               const tokens = JSON.parse(m.clobTokenIds);
               assetIdsToSubscribe.push(...tokens);
+
+              // Map asset token -> marketId for later price event handling
+              if (Array.isArray(tokens)) {
+                for (const t of tokens) {
+                  const set = this.assetToMarkets.get(t) || new Set<string>();
+                  set.add(m.id);
+                  this.assetToMarkets.set(t, set);
+                }
+              }
             } catch (e) {}
           }
         }
@@ -408,5 +440,16 @@ export class Bot {
         }
       }
     }
+
+    // Emit positions snapshot after a scan/strategy execution
+    this.emitPositions();
+  }
+
+  private emitPositions() {
+    try {
+      this.events.emit('positions', this.getPortfolio());
+    } catch (e) {
+      // best-effort: ignore, but log for diagnostics
+      console.debug("Non-critical error emitting positions event:", e);
   }
 }

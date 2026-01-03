@@ -32,7 +32,45 @@ export default function PortfolioTable() {
 
     fetchPortfolio();
     const interval = setInterval(fetchPortfolio, 5000);
-    return () => clearInterval(interval);
+
+    // SSE: subscribe to live positions updates if supported
+    let es: EventSource | null = null;
+    try {
+      if (typeof window !== "undefined" && typeof window.EventSource !== "undefined") {
+        es = new window.EventSource(`${API_BASE}/api/positions/stream`);
+        es.onmessage = (ev: MessageEvent) => {
+          try {
+            const data = JSON.parse(ev.data);
+            setPositions(Array.isArray(data?.positions) ? data.positions : []);
+            setSummary(data?.summary ?? null);
+          } catch (e) {
+            // ignore malformed SSE payloads but log for debugging
+            console.debug("Ignored malformed SSE payload in PortfolioTable:", e);
+          }
+        };
+        es.onerror = () => {
+          // best-effort: close and rely on periodic fetch fallback
+          try {
+            es?.close();
+          } catch (e) {
+            console.debug("Error while closing EventSource in PortfolioTable.onerror handler:", e);
+          }
+          es = null;
+        };
+      }
+    } catch (e) {
+      // ignore if EventSource not available, but log for debugging
+      console.debug("EventSource not available in this environment for PortfolioTable:", e);
+    }
+
+    return () => {
+      clearInterval(interval);
+      try {
+        es?.close();
+      } catch (e) {
+        console.debug("Error while closing EventSource in PortfolioTable cleanup:", e);
+      }
+    };
   }, []);
 
   return (

@@ -108,4 +108,48 @@ describe("PortfolioTable", () => {
     // Should fall back to empty list and show the empty-state row.
     expect(await screen.findByText("No active positions found")).toBeInTheDocument();
   });
+
+  it("consumes SSE updates and updates the table", async () => {
+    // stub fetch to return empty initially
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(responseJson({ positions: [], summary: null })));
+
+    // Mock EventSource
+    class MockEventSource {
+      public onmessage: ((ev: any) => void) | null = null;
+      public onerror: ((e: any) => void) | null = null;
+      constructor(public url: string) {
+        (MockEventSource as any).last = this;
+      }
+      close() { }
+      // helper to dispatch messages
+      dispatch(payload: any) {
+        if (this.onmessage) this.onmessage({ data: JSON.stringify(payload) });
+      }
+    }
+
+    // @ts-ignore
+    vi.stubGlobal("EventSource", MockEventSource);
+
+    render(<PortfolioTable />);
+
+    // get the created instance and dispatch an update
+    const inst = (MockEventSource as any).last as MockEventSource;
+    expect(inst).toBeDefined();
+
+    const payload = {
+      positions: [
+        { title: "Live Market", outcome: "YES", shares: 10, avgPrice: 0.4, currentPrice: 0.6, pnl: 2.0 },
+      ],
+      summary: { totalUnrealizedPnL: 2.0, openWinners: 1, openLosers: 0 },
+    };
+
+    inst.dispatch(payload);
+
+    expect(await screen.findByText("Live Market")).toBeInTheDocument();
+    expect(screen.getByText("WIN")).toBeInTheDocument();
+
+    // cleanup
+    // @ts-ignore
+    (global as any).EventSource = undefined;
+  });
 });

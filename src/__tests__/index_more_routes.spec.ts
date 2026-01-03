@@ -150,7 +150,7 @@ describe("createApp routes", () => {
 
     // stash restore function to use in afterEach
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (globalThis as any).__restoreConsole = (app.locals as any).restoreConsole;
+    (globalThis as any).__restoreConsole = app.locals.restoreConsole;
 
     const sget = await request(app).get("/api/settings");
     expect(sget.status).toBe(200);
@@ -175,5 +175,62 @@ describe("createApp routes", () => {
 
     const update = await request(app).post("/api/check-update");
     expect(update.status).toBe(500);
+  });
+
+  it("streams positions via SSE", async () => {
+    const { EventEmitter } = await import("events");
+    const emitter = new EventEmitter();
+
+    const bot = {
+      isBotRunning: vi.fn(() => false),
+      start: vi.fn(),
+      stop: vi.fn(),
+      getWalletBalance: vi.fn(() => 123),
+      setWalletBalance: vi.fn(),
+      resetPositions: vi.fn(),
+      resetWalletAndPositions: vi.fn(),
+      getSettings: vi.fn(() => ({ scanIntervalMs: 5000 })),
+      updateSettings: vi.fn((b: any) => b),
+      getPortfolio: vi.fn(() => ({ positions: [] })),
+      getScannedMarkets: vi.fn(() => []),
+      events: emitter,
+    };
+
+    const client = {
+      getAddress: vi.fn(() => "0xabc"),
+      getApiCallsPerMinute: vi.fn(() => 42),
+    };
+
+    const updateManager = {
+      checkForUpdates: vi.fn(async () => ({ hasUpdate: false })),
+      getLatestInfo: vi.fn(() => ({ hasUpdate: false })),
+    };
+
+    const app = createApp({
+      bot: bot as any,
+      client: client as any,
+      updateManager: updateManager as any,
+      packageVersion: "1.0.0",
+      paperTrading: true,
+      captureLogs: false,
+    });
+
+    // Start a non-buffered request to the SSE endpoint, then check the bot's emitter was registered
+    await new Promise<void>((resolve) => {
+      const r: any = request(app).get("/api/positions/stream").buffer(false);
+      // start the request
+      r.end(() => {});
+
+      setTimeout(() => {
+        // the SSE route should have attached a listener on the bot.events emitter
+        expect(emitter.listenerCount("positions")).toBeGreaterThanOrEqual(1);
+        // Clean up the attached listener(s) to avoid hanging the request and socket errors
+        emitter.removeAllListeners("positions");
+        setTimeout(() => {
+          expect(emitter.listenerCount("positions")).toBe(0);
+          resolve();
+        }, 10);
+      }, 50);
+    });
   });
 });
