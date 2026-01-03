@@ -7,7 +7,8 @@ describe("Strategy base", () => {
       id = "t";
       name = "Test";
       description = "Test";
-      async analyze() {
+      async analyze(context: any) {
+        // context is unused in this simple test
         return [];
       }
     }
