@@ -109,8 +109,9 @@ export class Bot {
         out.takeProfitPercentage = Math.max(0, input.takeProfitPercentage);
       }
       if (typeof input.scanIntervalMs === "number" && Number.isFinite(input.scanIntervalMs)) {
-        // Avoid hammering external APIs; keep within a sane range.
-        out.scanIntervalMs = Math.max(1000, Math.min(5 * 60 * 1000, input.scanIntervalMs));
+        // Allow faster scanning only when explicitly enabled via ALLOW_FAST_SCAN.
+        const minScan = process.env.ALLOW_FAST_SCAN === 'true' ? 200 : 1000;
+        out.scanIntervalMs = Math.max(minScan, Math.min(5 * 60 * 1000, input.scanIntervalMs));
       }
       if (typeof input.updownHoldMs === "number" && Number.isFinite(input.updownHoldMs)) {
         out.updownHoldMs = Math.max(60_000, Math.min(60 * 60 * 1000, input.updownHoldMs));
@@ -267,7 +268,8 @@ export class Bot {
         console.error("Error in bot loop:", error);
       }
 
-      const sleepMs = Math.max(1000, Number(this.settings.scanIntervalMs) || 5000);
+    const minScan = process.env.ALLOW_FAST_SCAN === 'true' ? 200 : 1000;
+    const sleepMs = Math.max(minScan, Number(this.settings.scanIntervalMs) || 5000);
       await new Promise((resolve) => setTimeout(resolve, sleepMs));
     }
   }

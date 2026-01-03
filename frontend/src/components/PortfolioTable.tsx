@@ -36,7 +36,7 @@ export default function PortfolioTable() {
   }, []);
 
   return (
-    <GlassCard className="col-span-1 md:col-span-2">
+    <GlassCard className="col-span-1 md:col-span-2" hoverEffect={false}>
       <div className="flex items-center gap-2 mb-6">
         <Briefcase className="w-5 h-5 text-purple-400" />
         <h2 className="text-lg font-semibold text-white/90">Active Positions</h2>
