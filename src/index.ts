@@ -194,8 +194,10 @@ export function createApp(opts: {
     res.setHeader("Connection", "keep-alive");
     // Send initial snapshot
     res.flushHeaders?.();
-    // Prevent unhandled socket errors when clients abort
-    res.on("error", () => {});
+    // Prevent unhandled socket errors when clients abort, but log them for debugging
+    res.on("error", (err) => {
+      console.error("SSE /api/positions/stream connection error:", err);
+    });
 
     const send = (payload: any) => {
       try {
