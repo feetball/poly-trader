@@ -82,9 +82,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-500/10 rounded-full blur-[120px]" />
       </div>
 
-      <div className="relative z-10 container mx-auto px-6 py-8 pb-20">
+      <div className="relative z-10 container mx-auto px-6 py-8 pb-20 lg:px-6">
         {/* Header */}
-        <header className="flex items-center justify-between mb-12">
+        <header className="flex items-center justify-between mb-12 ml-16 lg:ml-0">
           <div className="flex items-center gap-4">
             <div className="relative">
               <div className="absolute inset-0 bg-blue-500 blur-lg opacity-50" />

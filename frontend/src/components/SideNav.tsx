@@ -2,30 +2,35 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Settings, Briefcase, FileText } from "lucide-react";
+import { BarChart3, Settings, Briefcase, FileText, Menu, X } from "lucide-react";
+import { useState } from "react";
 
 interface SideNavProps {
-  status: any;
+  status: { status: string };
 }
+
+const navItems = [
+  { href: "/", label: "Dashboard", icon: BarChart3 },
+  { href: "/positions", label: "Positions", icon: Briefcase },
+  { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/logs", label: "Logs", icon: FileText },
+];
 
 export default function SideNav({ status }: SideNavProps) {
   const pathname = usePathname();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const navItems = [
-    { href: "/", label: "Dashboard", icon: BarChart3 },
-    { href: "/positions", label: "Positions", icon: Briefcase },
-    { href: "/settings", label: "Settings", icon: Settings },
-    { href: "/logs", label: "Logs", icon: FileText },
-  ];
+  const closeMobileMenu = () => setIsMobileMenuOpen(false);
 
-  return (
-    <nav className="hidden lg:flex flex-col gap-2 h-fit sticky top-8">
+  const renderNavContent = () => (
+    <>
       {navItems.map(({ href, label, icon: Icon }) => {
         const isActive = pathname === href;
         return (
           <Link
             key={href}
             href={href}
+            onClick={closeMobileMenu}
             className={`
               flex items-center gap-3 px-4 py-3 rounded-lg border transition-all duration-200
               ${
@@ -57,6 +62,49 @@ export default function SideNav({ status }: SideNavProps) {
           </span>
         </div>
       </div>
-    </nav>
+    </>
+  );
+
+  return (
+    <>
+      {/* Mobile Menu Button */}
+      <button
+        onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+        className="lg:hidden fixed top-6 left-6 z-50 p-3 rounded-xl bg-white/10 border border-white/20 backdrop-blur-md hover:bg-white/20 transition-all duration-200"
+        aria-label="Toggle menu"
+      >
+        {isMobileMenuOpen ? (
+          <X className="w-5 h-5 text-white" />
+        ) : (
+          <Menu className="w-5 h-5 text-white" />
+        )}
+      </button>
+
+      {/* Mobile Menu Overlay */}
+      {isMobileMenuOpen && (
+        <div
+          className="lg:hidden fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
+          onClick={closeMobileMenu}
+        />
+      )}
+
+      {/* Mobile Navigation Drawer */}
+      <nav
+        className={`
+          lg:hidden fixed top-0 left-0 bottom-0 z-40 w-64 bg-[#0a0a0a]/95 backdrop-blur-xl border-r border-white/10
+          transform transition-transform duration-300 ease-in-out
+          ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"}
+        `}
+      >
+        <div className="flex flex-col gap-2 p-6 pt-24">
+          {renderNavContent()}
+        </div>
+      </nav>
+
+      {/* Desktop Navigation */}
+      <nav className="hidden lg:flex flex-col gap-2 h-fit sticky top-8">
+        {renderNavContent()}
+      </nav>
+    </>
   );
 }
