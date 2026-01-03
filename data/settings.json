@@ -3,6 +3,8 @@
   "maxPositionSize": 500,
   "stopLossPercentage": 1,
   "takeProfitPercentage": 3,
+  "scanIntervalMs": 2000,
+  "updownHoldMs": 900000,
   "enabledStrategies": [
     "updown_15"
   ]
