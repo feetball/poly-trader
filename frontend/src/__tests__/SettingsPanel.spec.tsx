@@ -245,4 +245,68 @@ describe("SettingsPanel", () => {
     await user.click(screen.getByRole("button", { name: /^Reset$/i }));
     expect(await screen.findByText(/Reset failed/i)).toBeInTheDocument();
   });
+
+  it("does not render reset button when wallet balance is null", async () => {
+    const initialSettings = {
+      maxPositionSize: 50,
+      stopLossPercentage: 10,
+      takeProfitPercentage: 20,
+      enabledStrategies: ["arbitrage"],
+      scanIntervalMs: 5000,
+      updownHoldMs: 900000,
+    };
+
+    const fetchMock = vi.fn(async (input: any) => {
+      const url = String(input);
+      if (url.includes("/api/settings")) return responseJson(initialSettings);
+      if (url.includes("/api/version")) return responseJson({ currentVersion: "1.0.0" });
+      if (url.includes("/api/wallet")) throw new Error("wallet unavailable");
+      return responseJson({});
+    });
+
+    vi.stubGlobal("fetch", fetchMock as any);
+    render(<SettingsPanel />);
+
+    expect(await screen.findByText("Configuration")).toBeInTheDocument();
+    
+    // Reset button should not be visible when wallet fails to load
+    const resetButtons = screen.queryAllByRole("button", { name: /^Reset$/i });
+    expect(resetButtons).toHaveLength(0);
+  });
+
+  it("can toggle strategy checkboxes", async () => {
+    const initialSettings = {
+      maxPositionSize: 100,
+      stopLossPercentage: 5,
+      takeProfitPercentage: 15,
+      enabledStrategies: [],
+      scanIntervalMs: 5000,
+      updownHoldMs: 900000,
+    };
+
+    const fetchMock = vi.fn(async (input: any) => {
+      const url = String(input);
+      if (url.includes("/api/settings")) return responseJson(initialSettings);
+      if (url.includes("/api/version")) return responseJson({ currentVersion: "1.0.0" });
+      if (url.includes("/api/wallet")) return responseJson({ balance: 200 });
+      return responseJson({});
+    });
+
+    vi.stubGlobal("fetch", fetchMock as any);
+    const user = userEvent.setup();
+    render(<SettingsPanel />);
+
+    expect(await screen.findByText("Configuration")).toBeInTheDocument();
+
+    // Find and click an arbitrage checkbox
+    const arbitrageCheckbox = screen.getByRole("checkbox", { name: /arbitrage/i }) as HTMLInputElement;
+    expect(arbitrageCheckbox.checked).toBe(false);
+    
+    await user.click(arbitrageCheckbox);
+    expect(arbitrageCheckbox.checked).toBe(true);
+
+    // Uncheck it
+    await user.click(arbitrageCheckbox);
+    expect(arbitrageCheckbox.checked).toBe(false);
+  });
 });
