@@ -10,6 +10,15 @@ dotenv.config();
 type LogLevel = "log" | "info" | "warn" | "error";
 type LogEntry = { ts: number; level: LogLevel; message: string };
 
+// Extend Express types to include custom app.locals properties
+declare global {
+  namespace Express {
+    interface Locals {
+      restoreConsole: () => void;
+    }
+  }
+}
+
 export function createApp(opts: {
   bot: Bot;
   client: Pick<PolymarketClient, "getAddress" | "getApiCallsPerMinute">;
@@ -67,7 +76,7 @@ export function createApp(opts: {
   }
 
   // Allow tests/consumers to restore the original console methods.
-  (app.locals as any).restoreConsole = () => {
+  app.locals.restoreConsole = () => {
     console.log = originalConsole.log;
     console.info = originalConsole.info;
     console.warn = originalConsole.warn;
