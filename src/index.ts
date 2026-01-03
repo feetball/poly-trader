@@ -194,30 +194,31 @@ export function createApp(opts: {
     res.setHeader("Connection", "keep-alive");
     // Send initial snapshot
     res.flushHeaders?.();
-    // Prevent unhandled socket errors when clients abort
-    res.on("error", () => {});
+    // Prevent unhandled socket errors when clients abort, but log them for debugging
+    res.on("error", (err) => {
+      console.error("SSE /api/positions/stream connection error:", err);
+    });
 
     const send = (payload: any) => {
       try {
         res.write(`data: ${JSON.stringify(payload)}\n\n`);
       } catch (e) {
-        // Write errors occur when client disconnects (e.g., ERR_STREAM_WRITE_AFTER_END)
-        // This is expected behavior for SSE streams and can be safely ignored
-        console.warn(`[SSE] Failed to send data to client: ${e instanceof Error ? e.message : String(e)}`);
+        // Client disconnected or network error - log for debugging but don't crash
+        console.error("SSE write error (client likely disconnected):", e);
       }
     };
 
     send(bot.getPortfolio());
 
     const handler = (payload: any) => send(payload);
-    if (bot && (bot as any).events && typeof (bot as any).events.on === "function") {
-      (bot as any).events.on("positions", handler);
+    if (bot && bot.events && typeof bot.events.on === "function") {
+      bot.events.on("positions", handler);
     }
 
     req.on("close", () => {
       try {
-        if (bot && (bot as any).events && typeof (bot as any).events.off === "function") {
-          (bot as any).events.off("positions", handler);
+        if (bot && bot.events && typeof bot.events.off === "function") {
+          bot.events.off("positions", handler);
         }
       } catch (e) {}
     });

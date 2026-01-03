@@ -44,27 +44,37 @@ export default function PortfolioTable() {
             setPositions(Array.isArray(data?.positions) ? data.positions : []);
             setSummary(data?.summary ?? null);
           } catch (e) {
-            // ignore malformed SSE payloads
+            // ignore malformed SSE payloads but log for debugging
+            console.debug("Ignored malformed SSE payload in PortfolioTable:", e);
           }
         };
         es.onerror = () => {
           // best-effort: close and rely on periodic fetch fallback
-          try { es?.close(); } catch (e) {}
+          try {
+            es?.close();
+          } catch (e) {
+            console.debug("Error while closing EventSource in PortfolioTable.onerror handler:", e);
+          }
           es = null;
         };
       }
     } catch (e) {
-      // ignore if EventSource not available
+      // ignore if EventSource not available, but log for debugging
+      console.debug("EventSource not available in this environment for PortfolioTable:", e);
     }
 
     return () => {
       clearInterval(interval);
-      try { es?.close(); } catch (e) {}
+      try {
+        es?.close();
+      } catch (e) {
+        console.debug("Error while closing EventSource in PortfolioTable cleanup:", e);
+      }
     };
   }, []);
 
   return (
-    <GlassCard className="col-span-1 md:col-span-2">
+    <GlassCard className="col-span-1 md:col-span-2" hoverEffect={false}>
       <div className="flex items-center gap-2 mb-6">
         <Briefcase className="w-5 h-5 text-purple-400" />
         <h2 className="text-lg font-semibold text-white/90">Active Positions</h2>
