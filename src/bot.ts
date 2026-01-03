@@ -1,4 +1,6 @@
-import { PolymarketClient } from "./clients/polymarket";import { EventEmitter } from "events";import { Strategy, StrategyContext } from "./strategies/base";
+import { PolymarketClient } from "./clients/polymarket";
+import { EventEmitter } from "events";
+import { Strategy, StrategyContext } from "./strategies/base";
 import { ArbitrageStrategy } from "./strategies/arbitrage";
 import { VolumeSpikeStrategy } from "./strategies/volume";
 import { UpDown15Strategy } from "./strategies/updown15";
