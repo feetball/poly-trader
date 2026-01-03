@@ -201,7 +201,8 @@ export function createApp(opts: {
       try {
         res.write(`data: ${JSON.stringify(payload)}\n\n`);
       } catch (e) {
-        // ignore write errors
+        // Client disconnected or network error - log for debugging but don't crash
+        console.error("SSE write error (client likely disconnected):", e);
       }
     };
 
