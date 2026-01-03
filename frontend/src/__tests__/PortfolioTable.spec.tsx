@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, act } from "@testing-library/react";
 import PortfolioTable from "@/components/PortfolioTable";
 
 function responseJson(data: any) {
@@ -110,6 +110,8 @@ describe("PortfolioTable", () => {
   });
 
   it("consumes SSE updates and updates the table", async () => {
+    vi.useFakeTimers();
+    
     // stub fetch to return empty initially
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(responseJson({ positions: [], summary: null })));
 
@@ -122,8 +124,12 @@ describe("PortfolioTable", () => {
       }
       close() { }
       // helper to dispatch messages
-      dispatch(payload: any) {
-        if (this.onmessage) this.onmessage({ data: JSON.stringify(payload) });
+      async dispatch(payload: any) {
+        if (this.onmessage) {
+          await act(async () => {
+            this.onmessage!({ data: JSON.stringify(payload) } as any);
+          });
+        }
       }
     }
 
@@ -131,6 +137,11 @@ describe("PortfolioTable", () => {
     vi.stubGlobal("EventSource", MockEventSource);
 
     render(<PortfolioTable />);
+    
+    // Fast forward past initial fetch
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+    });
 
     // get the created instance and dispatch an update
     const inst = (MockEventSource as any).last as MockEventSource;
@@ -143,12 +154,12 @@ describe("PortfolioTable", () => {
       summary: { totalUnrealizedPnL: 2.0, openWinners: 1, openLosers: 0 },
     };
 
-    inst.dispatch(payload);
+    await inst.dispatch(payload);
 
-    expect(await screen.findByText("Live Market")).toBeInTheDocument();
+    expect(screen.getByText("Live Market")).toBeInTheDocument();
     expect(screen.getByText("WIN")).toBeInTheDocument();
 
-    // cleanup
+    vi.useRealTimers();
     // @ts-ignore
     (global as any).EventSource = undefined;
   });

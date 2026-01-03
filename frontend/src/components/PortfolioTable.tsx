@@ -36,8 +36,8 @@ export default function PortfolioTable() {
     // SSE: subscribe to live positions updates if supported
     let es: EventSource | null = null;
     try {
-      if (typeof window !== "undefined" && typeof window.EventSource !== "undefined") {
-        es = new window.EventSource(`${API_BASE}/api/positions/stream`);
+      if (typeof (window as any).EventSource !== "undefined") {
+        es = new (window as any).EventSource(`${API_BASE}/api/positions/stream`);
         es.onmessage = (ev: MessageEvent) => {
           try {
             const data = JSON.parse(ev.data);
