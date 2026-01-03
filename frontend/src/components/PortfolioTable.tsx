@@ -36,8 +36,10 @@ export default function PortfolioTable() {
     // SSE: subscribe to live positions updates if supported
     let es: EventSource | null = null;
     try {
-      if (typeof window !== "undefined" && typeof window.EventSource !== "undefined") {
-        es = new window.EventSource(`${API_BASE}/api/positions/stream`);
+      // Note: Using (window as any).EventSource instead of window.EventSource for test compatibility.
+      // This allows vi.stubGlobal("EventSource", ...) in tests to properly mock the EventSource.
+      if (typeof (window as any).EventSource !== "undefined") {
+        es = new (window as any).EventSource(`${API_BASE}/api/positions/stream`);
         es.onmessage = (ev: MessageEvent) => {
           try {
             const data = JSON.parse(ev.data);
