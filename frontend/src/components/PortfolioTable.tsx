@@ -44,22 +44,32 @@ export default function PortfolioTable() {
             setPositions(Array.isArray(data?.positions) ? data.positions : []);
             setSummary(data?.summary ?? null);
           } catch (e) {
-            // ignore malformed SSE payloads
+            // ignore malformed SSE payloads but log for debugging
+            console.debug("Ignored malformed SSE payload in PortfolioTable:", e);
           }
         };
         es.onerror = () => {
           // best-effort: close and rely on periodic fetch fallback
-          try { es?.close(); } catch (e) {}
+          try {
+            es?.close();
+          } catch (e) {
+            console.debug("Error while closing EventSource in PortfolioTable.onerror handler:", e);
+          }
           es = null;
         };
       }
     } catch (e) {
-      // ignore if EventSource not available
+      // ignore if EventSource not available, but log for debugging
+      console.debug("EventSource not available in this environment for PortfolioTable:", e);
     }
 
     return () => {
       clearInterval(interval);
-      try { es?.close(); } catch (e) {}
+      try {
+        es?.close();
+      } catch (e) {
+        console.debug("Error while closing EventSource in PortfolioTable cleanup:", e);
+      }
     };
   }, []);
 
