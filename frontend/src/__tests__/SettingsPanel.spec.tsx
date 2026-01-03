@@ -246,7 +246,7 @@ describe("SettingsPanel", () => {
     expect(await screen.findByText(/Reset failed/i)).toBeInTheDocument();
   });
 
-  it("handles null wallet balance", async () => {
+  it("does not render reset button when wallet balance is null", async () => {
     const initialSettings = {
       maxPositionSize: 50,
       stopLossPercentage: 10,
@@ -260,7 +260,7 @@ describe("SettingsPanel", () => {
       const url = String(input);
       if (url.includes("/api/settings")) return responseJson(initialSettings);
       if (url.includes("/api/version")) return responseJson({ currentVersion: "1.0.0" });
-      if (url.includes("/api/wallet")) throw new Error("wallet error");
+      if (url.includes("/api/wallet")) throw new Error("wallet unavailable");
       return responseJson({});
     });
 
@@ -268,16 +268,18 @@ describe("SettingsPanel", () => {
     render(<SettingsPanel />);
 
     expect(await screen.findByText("Configuration")).toBeInTheDocument();
-    // Wallet section should not be rendered when balance is null
-    expect(screen.queryByText(/Wallet Balance/i)).not.toBeInTheDocument();
+    
+    // Reset button should not be visible when wallet fails to load
+    const resetButtons = screen.queryAllByRole("button", { name: /^Reset$/i });
+    expect(resetButtons).toHaveLength(0);
   });
 
   it("can toggle strategy checkboxes", async () => {
     const initialSettings = {
-      maxPositionSize: 50,
-      stopLossPercentage: 10,
-      takeProfitPercentage: 20,
-      enabledStrategies: ["arbitrage"],
+      maxPositionSize: 100,
+      stopLossPercentage: 5,
+      takeProfitPercentage: 15,
+      enabledStrategies: [],
       scanIntervalMs: 5000,
       updownHoldMs: 900000,
     };
@@ -286,23 +288,25 @@ describe("SettingsPanel", () => {
       const url = String(input);
       if (url.includes("/api/settings")) return responseJson(initialSettings);
       if (url.includes("/api/version")) return responseJson({ currentVersion: "1.0.0" });
-      if (url.includes("/api/wallet")) return responseJson({ balance: 100 });
+      if (url.includes("/api/wallet")) return responseJson({ balance: 200 });
       return responseJson({});
     });
 
     vi.stubGlobal("fetch", fetchMock as any);
-
     const user = userEvent.setup();
     render(<SettingsPanel />);
 
     expect(await screen.findByText("Configuration")).toBeInTheDocument();
 
-    // Click on volume spike strategy to enable it
-    const volumeSpike = screen.getByText(/volume spike/i);
-    await user.click(volumeSpike);
+    // Find and click an arbitrage checkbox
+    const arbitrageCheckbox = screen.getByRole("checkbox", { name: /arbitrage/i }) as HTMLInputElement;
+    expect(arbitrageCheckbox.checked).toBe(false);
+    
+    await user.click(arbitrageCheckbox);
+    expect(arbitrageCheckbox.checked).toBe(true);
 
-    // Click on arbitrage to disable it
-    const arbitrage = screen.getByText(/arbitrage/i);
-    await user.click(arbitrage);
+    // Uncheck it
+    await user.click(arbitrageCheckbox);
+    expect(arbitrageCheckbox.checked).toBe(false);
   });
 });
