@@ -25,7 +25,7 @@ export class VolumeSpikeStrategy extends Strategy {
         if (!market.active || market.closed) continue;
 
         const currentVolume = parseFloat(market.volume || "0");
-        const previousVolume = this.volumeHistory.get(market.id) || currentVolume;
+        const previousVolume = this.volumeHistory.get(market.id) ?? currentVolume;
         
         // Update history
         this.volumeHistory.set(market.id, currentVolume);

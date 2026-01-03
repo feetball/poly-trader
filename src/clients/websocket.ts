@@ -5,6 +5,7 @@ export class MarketDataStream extends EventEmitter {
   private ws: WebSocket | null = null;
   private pingInterval: NodeJS.Timeout | null = null;
   private subscriptions: Set<string> = new Set();
+  private sentSubscriptions: Set<string> = new Set();
   private url = process.env.POLYMARKET_WS_URL || "wss://ws-subscriptions-clob.polymarket.com/ws/market";
   private channelType = process.env.POLYMARKET_WS_CHANNEL || "market";
 
@@ -18,6 +19,8 @@ export class MarketDataStream extends EventEmitter {
     this.ws.on('open', () => {
       console.log('Connected to Polymarket WS');
       this.startPing();
+      // New connection; force a fresh re-subscribe.
+      this.sentSubscriptions.clear();
       this.resubscribe();
     });
 
@@ -53,7 +56,11 @@ export class MarketDataStream extends EventEmitter {
       return;
     }
 
-    const newAssetIds = assetIds.filter((id) => !this.subscriptions.has(id));
+    // Always treat incoming IDs as desired subscriptions.
+    assetIds.forEach((id) => this.subscriptions.add(id));
+
+    // Only send IDs we haven't sent on this connection.
+    const newAssetIds = assetIds.filter((id) => !this.sentSubscriptions.has(id));
     if (newAssetIds.length === 0) {
       return;
     }
@@ -66,7 +73,7 @@ export class MarketDataStream extends EventEmitter {
     };
     
     this.ws.send(JSON.stringify(msg));
-    newAssetIds.forEach(id => this.subscriptions.add(id));
+    newAssetIds.forEach(id => this.sentSubscriptions.add(id));
     console.log(`Subscribed to ${newAssetIds.length} assets`);
   }
 
@@ -100,5 +107,6 @@ export class MarketDataStream extends EventEmitter {
 
   private stopPing() {
     if (this.pingInterval) clearInterval(this.pingInterval);
+    this.pingInterval = null;
   }
 }

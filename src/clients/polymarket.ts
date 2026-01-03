@@ -98,8 +98,6 @@ export class PolymarketClient {
   }
 
   async createOrder(tokenId: string, price: number, size: number, side: Side) {
-    if (!this.client) throw new Error("Client not initialized");
-    
     if (this.paperTrading) {
       console.log(`[PAPER TRADE] ${side} Order: ${size} shares of ${tokenId} @ $${price}`);
       // Simulate order execution
@@ -109,6 +107,8 @@ export class PolymarketClient {
         sizeMatched: size
       };
     }
+
+    if (!this.client) throw new Error("Client not initialized");
 
     this.recordApiCall();
     return await this.client.createOrder({
