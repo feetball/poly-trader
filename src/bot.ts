@@ -362,7 +362,10 @@ export class Bot {
                   this.assetToMarkets.set(t, set);
                 }
               }
-            } catch (e) {}
+            } catch (e) {
+              // Log malformed clobTokenIds but continue scanning other markets
+              console.warn(`Failed to parse clobTokenIds for market ${m.id}:`, e);
+            }
           }
         }
       }
