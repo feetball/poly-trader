@@ -187,6 +187,40 @@ export function createApp(opts: {
     res.json(bot.getPortfolio());
   });
 
+  // Server-Sent Events: stream live positions (sends initial snapshot followed by updates)
+  app.get("/api/positions/stream", (req, res) => {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    // Send initial snapshot
+    res.flushHeaders?.();
+    // Prevent unhandled socket errors when clients abort
+    res.on("error", () => {});
+
+    const send = (payload: any) => {
+      try {
+        res.write(`data: ${JSON.stringify(payload)}\n\n`);
+      } catch (e) {
+        // ignore write errors
+      }
+    };
+
+    send(bot.getPortfolio());
+
+    const handler = (payload: any) => send(payload);
+    if (bot && (bot as any).events && typeof (bot as any).events.on === "function") {
+      (bot as any).events.on("positions", handler);
+    }
+
+    req.on("close", () => {
+      try {
+        if (bot && (bot as any).events && typeof (bot as any).events.off === "function") {
+          (bot as any).events.off("positions", handler);
+        }
+      } catch (e) {}
+    });
+  });
+
   app.get("/api/markets", (req, res) => {
     res.json(bot.getScannedMarkets());
   });

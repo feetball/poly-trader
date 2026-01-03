@@ -32,7 +32,35 @@ export default function PortfolioTable() {
 
     fetchPortfolio();
     const interval = setInterval(fetchPortfolio, 5000);
-    return () => clearInterval(interval);
+
+    // SSE: subscribe to live positions updates if supported
+    let es: EventSource | null = null;
+    try {
+      if (typeof (window as any).EventSource !== "undefined") {
+        es = new (window as any).EventSource(`${API_BASE}/api/positions/stream`);
+        es.onmessage = (ev: MessageEvent) => {
+          try {
+            const data = JSON.parse(ev.data);
+            setPositions(Array.isArray(data?.positions) ? data.positions : []);
+            setSummary(data?.summary ?? null);
+          } catch (e) {
+            // ignore malformed SSE payloads
+          }
+        };
+        es.onerror = () => {
+          // best-effort: close and rely on periodic fetch fallback
+          try { es?.close(); } catch (e) {}
+          es = null;
+        };
+      }
+    } catch (e) {
+      // ignore if EventSource not available
+    }
+
+    return () => {
+      clearInterval(interval);
+      try { es?.close(); } catch (e) {}
+    };
   }, []);
 
   return (
