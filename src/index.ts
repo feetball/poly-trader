@@ -208,14 +208,14 @@ export function createApp(opts: {
     send(bot.getPortfolio());
 
     const handler = (payload: any) => send(payload);
-    if (bot && (bot as any).events && typeof (bot as any).events.on === "function") {
-      (bot as any).events.on("positions", handler);
+    if (bot && bot.events && typeof bot.events.on === "function") {
+      bot.events.on("positions", handler);
     }
 
     req.on("close", () => {
       try {
-        if (bot && (bot as any).events && typeof (bot as any).events.off === "function") {
-          (bot as any).events.off("positions", handler);
+        if (bot && bot.events && typeof bot.events.off === "function") {
+          bot.events.off("positions", handler);
         }
       } catch (e) {}
     });
