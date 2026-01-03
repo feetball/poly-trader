@@ -150,7 +150,7 @@ describe("createApp routes", () => {
 
     // stash restore function to use in afterEach
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (globalThis as any).__restoreConsole = (app.locals as any).restoreConsole;
+    (globalThis as any).__restoreConsole = app.locals.restoreConsole;
 
     const sget = await request(app).get("/api/settings");
     expect(sget.status).toBe(200);

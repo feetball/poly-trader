@@ -245,4 +245,64 @@ describe("SettingsPanel", () => {
     await user.click(screen.getByRole("button", { name: /^Reset$/i }));
     expect(await screen.findByText(/Reset failed/i)).toBeInTheDocument();
   });
+
+  it("handles null wallet balance", async () => {
+    const initialSettings = {
+      maxPositionSize: 50,
+      stopLossPercentage: 10,
+      takeProfitPercentage: 20,
+      enabledStrategies: ["arbitrage"],
+      scanIntervalMs: 5000,
+      updownHoldMs: 900000,
+    };
+
+    const fetchMock = vi.fn(async (input: any) => {
+      const url = String(input);
+      if (url.includes("/api/settings")) return responseJson(initialSettings);
+      if (url.includes("/api/version")) return responseJson({ currentVersion: "1.0.0" });
+      if (url.includes("/api/wallet")) throw new Error("wallet error");
+      return responseJson({});
+    });
+
+    vi.stubGlobal("fetch", fetchMock as any);
+    render(<SettingsPanel />);
+
+    expect(await screen.findByText("Configuration")).toBeInTheDocument();
+    // Wallet section should not be rendered when balance is null
+    expect(screen.queryByText(/Wallet Balance/i)).not.toBeInTheDocument();
+  });
+
+  it("can toggle strategy checkboxes", async () => {
+    const initialSettings = {
+      maxPositionSize: 50,
+      stopLossPercentage: 10,
+      takeProfitPercentage: 20,
+      enabledStrategies: ["arbitrage"],
+      scanIntervalMs: 5000,
+      updownHoldMs: 900000,
+    };
+
+    const fetchMock = vi.fn(async (input: any) => {
+      const url = String(input);
+      if (url.includes("/api/settings")) return responseJson(initialSettings);
+      if (url.includes("/api/version")) return responseJson({ currentVersion: "1.0.0" });
+      if (url.includes("/api/wallet")) return responseJson({ balance: 100 });
+      return responseJson({});
+    });
+
+    vi.stubGlobal("fetch", fetchMock as any);
+
+    const user = userEvent.setup();
+    render(<SettingsPanel />);
+
+    expect(await screen.findByText("Configuration")).toBeInTheDocument();
+
+    // Click on volume spike strategy to enable it
+    const volumeSpike = screen.getByText(/volume spike/i);
+    await user.click(volumeSpike);
+
+    // Click on arbitrage to disable it
+    const arbitrage = screen.getByText(/arbitrage/i);
+    await user.click(arbitrage);
+  });
 });
