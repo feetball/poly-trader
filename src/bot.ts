@@ -449,7 +449,7 @@ export class Bot {
     try {
       this.events.emit('positions', this.getPortfolio());
     } catch (e) {
-      // best-effort: ignore
-    }
+      // best-effort: ignore, but log for diagnostics
+      console.debug("Non-critical error emitting positions event:", e);
   }
 }
